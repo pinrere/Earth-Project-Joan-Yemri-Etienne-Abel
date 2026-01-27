@@ -10,7 +10,7 @@ pygame.display.set_caption("Ecohead")
 
 # creation of the player
 
-player = pl.Player(100, 1,0,1040)
+player = pl.Player(100, 1,0,1017)
 
 # main
 
@@ -20,7 +20,7 @@ playing = True
 while playing:
 
     screen.fill((0,0,0))
-    playerOnScreen = pygame.draw.rect(screen,(255,0,0),pygame.Rect(player.posx, player.posy, 40, 40))
+    screen.blit(pygame.image.load(player.skin),(player.posx,player.posy))
     pygame.display.update()
 
     for events in pygame.event.get():
@@ -30,10 +30,10 @@ while playing:
     key = pygame.key.get_pressed()
     if key[pygame.K_q] and player.posx > 0:
         player.moveLeft()
-    if key[pygame.K_d] and player.posx < screen_width-40:
+    if key[pygame.K_d] and player.posx < screen_width-63:
         player.moveRight()
-    if key[pygame.K_SPACE] and player.posy >= screen_height - 40:
+    if key[pygame.K_SPACE] and player.posy >= screen_height-63:
         player.jump()
 
-    if player.posy<screen_height-40:
+    if player.posy<screen_height-63:
         player.posy += 0.2
