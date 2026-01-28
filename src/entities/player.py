@@ -6,7 +6,6 @@ class Player:
         self.posx = x
         self.posy = y
         self.orientation = 1
-        self.skin = "../assets/images/player/leftSkin.png"
 
     def moveRight(self):
         self.posx += self.speed
@@ -17,4 +16,4 @@ class Player:
         self.orientation = -1
 
     def jump(self):
-        self.posy -= 100
+        self.posy -= 50

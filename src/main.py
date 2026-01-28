@@ -3,14 +3,14 @@ import entities.player as pl
 
 # creation of the game window
 
-screen_width = 1920
-screen_height = 1080
+screen_width = 640
+screen_height = 480
 screen = pygame.display.set_mode((screen_width,screen_height))
 pygame.display.set_caption("Ecohead")
 
 # creation of the player
 
-player = pl.Player(100, 1,0,1017)
+player = pl.Player(100, 1,200, 200)
 
 # main
 
@@ -20,7 +20,7 @@ playing = True
 while playing:
 
     screen.fill((0,0,0))
-    screen.blit(pygame.image.load(player.skin),(player.posx,player.posy))
+    pygame.draw.rect(screen,(0,255,0),pygame.Rect(player.posx,player.posy,50,50))
     pygame.display.update()
 
     for events in pygame.event.get():
@@ -30,10 +30,10 @@ while playing:
     key = pygame.key.get_pressed()
     if key[pygame.K_q] and player.posx > 0:
         player.moveLeft()
-    if key[pygame.K_d] and player.posx < screen_width-63:
+    if key[pygame.K_d] and player.posx < screen_width-50:
         player.moveRight()
-    if key[pygame.K_SPACE] and player.posy >= screen_height-63:
+    if key[pygame.K_SPACE] and player.posy >= screen_height-50:
         player.jump()
 
-    if player.posy<screen_height-63:
-        player.posy += 0.2
+    if player.posy<screen_height-50:
+        player.posy += 0.1
