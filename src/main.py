@@ -35,12 +35,15 @@ while playing:
         player.moveRight()
     if key[pygame.K_SPACE] and player.posy >= screen_height-50:
         player.jump()
+
     if key[pygame.K_z]:
         projectile = player.tirer()
-        pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(projectile.posx, projectile.posy, 10, 4))
 
-    if projectile != None:
+    print(projectile)
+    if projectile is not None:
         projectile.avancer()
+        pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(projectile.posx, projectile.posy, 10, 4))
+        pygame.display.update()
 
     if player.posy<screen_height-50:
         player.posy += 0.1
