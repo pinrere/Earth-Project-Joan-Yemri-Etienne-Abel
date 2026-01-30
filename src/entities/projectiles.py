@@ -7,3 +7,6 @@ class ProjectilJoueur:
 
     def avancer(self):
         self.posx += self.vitesse
+
+    def get_posx(self):
+        return self.posx

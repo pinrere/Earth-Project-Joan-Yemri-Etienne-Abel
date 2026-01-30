@@ -25,4 +25,4 @@ class Player:
         self.posy -= 50
 
     def tirer(self):
-        return pr.ProjectilJoueur(self.posx + self.size + 10,self.posy + self.size + 10,self.orientation)
+        return pr.ProjectilJoueur(self.posx + self.size + 10,self.posy + 10,self.orientation)

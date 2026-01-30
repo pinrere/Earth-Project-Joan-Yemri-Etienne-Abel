@@ -22,7 +22,6 @@ while playing:
 
     screen.fill((0,0,0))
     pygame.draw.rect(screen,(0,255,0),pygame.Rect(player.posx,player.posy,player.size,player.size))
-    pygame.display.update()
 
     for events in pygame.event.get():
         if events.type == pygame.QUIT:
@@ -36,14 +35,23 @@ while playing:
     if key[pygame.K_SPACE] and player.posy >= screen_height-50:
         player.jump()
 
+    projectiles = []
     if key[pygame.K_z]:
         projectile = player.tirer()
+        projectiles.append(projectile)
 
-    print(projectile)
-    if projectile is not None:
-        projectile.avancer()
-        pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(projectile.posx, projectile.posy, 10, 4))
-        pygame.display.update()
+    compteur = 0
+    for projectile in projectiles[:] :
+        if projectile is not None:
+            projectile.avancer()
+            pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(projectile.posx, projectile.posy, 10, 4))
+            compteur += 1
+            print(compteur)
+            if projectile.get_posx() > screen_width or projectile.get_posx() < 0 :
+                projectiles.remove(projectile)
+                print("dell")
+
+    pygame.display.update()
 
     if player.posy<screen_height-50:
         player.posy += 0.1
