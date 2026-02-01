@@ -86,18 +86,20 @@ class Player(pygame.sprite.Sprite):
     SPRITES = load_sprites_from_folder("MainCharacters", "MaleChar",3, True)
     ANIMATION_DELAY = 4
 
-    def __init__(self, x, y, widht, height):
+    def __init__(self, x, y, width, height):
         super().__init__()
-        self.rect = pygame.Rect(x, y, widht, height)
+        self.hitbox = pygame.Rect(x, y, width, height)
+        self.rect = self.hitbox.copy()
         self.x_vel = 0
         self.y_vel = 0
-        self.mask = None
         self.direction = "left"
         self.animation_count = 0
         self.fall_count = 0
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.sprite_offset_x = 69
+        self.sprite_offset_y = 52
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut suater moins haut
@@ -107,8 +109,9 @@ class Player(pygame.sprite.Sprite):
             self.fall_count = 0
 
     def move(self, dx, dy):
-        self.rect.x += dx
-        self.rect.y += dy
+        self.hitbox.x += dx
+        self.hitbox.y += dy
+        self.rect.topleft = self.hitbox.topleft
 
     def make_hit(self):
         self.hit = True
@@ -145,36 +148,42 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
 
     def hit_head(self):
-        self.count = 0
+        self.fall_count = 0
         self.y_vel *= -1
 
     def update_sprite(self):
         sprite_sheet = "idle"
+
         if self.hit:
             sprite_sheet = "hit"
-        elif self.y_vel < 0 or self.y_vel > self.GRAVITY * 2:
-            if self.jump_count == 1:
-                sprite_sheet = "jump"
-            elif self.jump_count == 2:
-                sprite_sheet = "double_jump"
-        elif self.y_vel > self.GRAVITY * 2:
+
+        elif self.y_vel < 0:
+            sprite_sheet = "jump"
+
+        elif self.y_vel > self.GRAVITY:
             sprite_sheet = "fall"
+
         elif self.x_vel != 0:
             sprite_sheet = "run"
 
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
+
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
         self.sprite = sprites[sprite_index]
+
         self.animation_count += 1
         self.update()
 
     def update(self):
-        self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
-        self.mask = pygame.mask.from_surface(self.sprite)
+        self.rect.topleft = self.hitbox.topleft
 
     def draw(self, win, offset_x):
-        win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
+        win.blit(
+            self.sprite,
+            (self.hitbox.x - offset_x - self.sprite_offset_x,
+             self.hitbox.y - self.sprite_offset_y)
+        )
 
 
 class Object(pygame.sprite.Sprite):
@@ -194,7 +203,6 @@ class Block(Object):
         super().__init__(x, y, size, size)
         block = get_block(size)
         self.image.blit(block, (0,0))
-        self.mask = pygame.mask.from_surface(self.image)
 
 class Fire(Object):
     ANIMATION_DELAY = 3
@@ -203,7 +211,6 @@ class Fire(Object):
         super().__init__(x, y, width, height, "fire")
         self.fire = load_sprite_sheets("Traps", "Fire", width, height)
         self.image = self.fire["on"][0]
-        self.mask = pygame.mask.from_surface(self.image)
         self.animation_count = 0
         self.animation_name = "on"
 
@@ -220,7 +227,6 @@ class Fire(Object):
         self.animation_count += 1
 
         self.rect = self.image.get_rect(topleft=(self.rect.x, self.rect.y))
-        self.mask = pygame.mask.from_surface(self.image)
 
         if self.animation_count // self.ANIMATION_DELAY > len(sprites):
             self.animation_count = 0
@@ -238,7 +244,6 @@ def get_background(name):
 
     return tiles, image
 
-
 def draw(window, background, bg_image, player, objects, offset_x):
     for tile in background:
         window.blit(bg_image, tile)
@@ -246,37 +251,47 @@ def draw(window, background, bg_image, player, objects, offset_x):
     for obj in objects:
         obj.draw(window, offset_x)
 
+    pygame.draw.rect(
+        window,
+        (255, 0, 0),
+        player.hitbox.move(-offset_x, 0),
+        2
+    )
     player.draw(window, offset_x)
 
     pygame.display.update()
 
 def handle_vertical_collision(player, objects, dy):
-    collided_objects = []
+    collided = []
+
     for obj in objects:
-        if pygame.sprite.collide_mask(player, obj):
-            if dy > 0:
-                player.rect.bottom = obj.rect.top
-                player.landed()
-            elif dy < 0:
-                player.rect.top = obj.rect.bottom
-                player.hit_head()
+        if player.hitbox.colliderect(obj.rect):
+            if dy > 0:  # chute
+                player.hitbox.bottom = obj.rect.top
+                player.y_vel = 0
+                player.fall_count = 0
+                player.jump_count = 0
+            elif dy < 0:  # plafond
+                player.hitbox.top = obj.rect.bottom
+                player.y_vel = 0
 
-            collided_objects.append(obj)
+            collided.append(obj)
 
-    return collided_objects
+    player.rect.topleft = player.hitbox.topleft
+    return collided
 
 def collide(player, objects, dx):
-    player.move(dx, 0)
-    player.update()
-    collided_objects = None
+    player.hitbox.x += dx
+
+    collided_object = None
     for obj in objects:
-        if pygame.sprite.collide_mask(player, obj):
-            collided_objects = obj
+        if player.hitbox.colliderect(obj.rect):
+            collided_object = obj
             break
 
-    player.move(-dx, 0)
-    player.update()
-    return collided_objects
+    player.hitbox.x -= dx
+    player.rect.topleft = player.hitbox.topleft
+    return collided_object
 
 def handle_move(player, objects):
     keys = pygame.key.get_pressed()
@@ -302,7 +317,7 @@ def main(window):
 
     block_size = 96
 
-    player = Player(100, 100, 50, 50)
+    player = Player(100, 100, 57, 93)
     fire = Fire(100, HEIGHT - block_size - 64,16, 32)
     fire.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
