@@ -4,6 +4,7 @@ import math
 import pygame
 from os import listdir
 from os.path import isfile, join
+from collections import defaultdict
 pygame.init()
 
 
@@ -18,6 +19,32 @@ window = pygame.display.set_mode((WIDTH, HEIGHT))
 
 def flip(sprites):
     return [pygame.transform.flip(sprite, True, False) for sprite in sprites]
+
+def load_sprites_from_folder(dir1, dir2, scale=2, direction=False):
+    path = join("assets", dir1, dir2)
+    files = [f for f in os.listdir(path) if f.endswith(".png")]
+
+    animations = defaultdict(list)
+
+    for file in sorted(files):
+        name = ''.join([c for c in file if not c.isdigit()]).replace(".png", "")
+        image = pygame.image.load(join(path, file)).convert_alpha()
+
+        if scale != 1:
+            image = pygame.transform.scale_by(image, scale)
+
+        animations[name].append(image)
+
+    all_sprites = {}
+
+    if direction:
+        for anim, frames in animations.items():
+            all_sprites[f"{anim}_right"] = frames
+            all_sprites[f"{anim}_left"] = [pygame.transform.flip(f, True, False) for f in frames]
+    else:
+        all_sprites = dict(animations)
+
+    return all_sprites
 
 def load_sprite_sheets(dir1, dir2, width, height, direction = False):
     path = join("assets", dir1, dir2)
@@ -56,7 +83,7 @@ def get_block(size):
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 1
-    SPRITES = load_sprite_sheets("MainCharacters", "EcoGuardian", 64, 64, True)
+    SPRITES = load_sprites_from_folder("MainCharacters", "MaleChar",3, True)
     ANIMATION_DELAY = 4
 
     def __init__(self, x, y, widht, height):
