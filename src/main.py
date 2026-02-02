@@ -97,8 +97,8 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
-        self.sprite_offset_x = 69
-        self.sprite_offset_y = 52
+        self.sprite_offset_x = 67
+        self.sprite_offset_y = 50
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut suater moins haut
@@ -152,18 +152,26 @@ class Player(pygame.sprite.Sprite):
 
     def update_sprite(self):
         sprite_sheet = "idle"
+        self.sprite_offset_y = 50
+        self.sprite_offset_x = 67
 
         if self.hit:
             sprite_sheet = "hit"
 
         elif self.y_vel < 0:
             sprite_sheet = "jump"
+            self.sprite_offset_y = 34
 
         elif self.y_vel > self.GRAVITY:
             sprite_sheet = "fall"
+            self.sprite_offset_y = 34
 
         elif self.x_vel != 0:
             sprite_sheet = "run"
+            if self.direction == "right":
+                self.sprite_offset_x += 6
+            else:
+                self.sprite_offset_x -= 6
 
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
@@ -316,7 +324,7 @@ def main(window):
 
     block_size = 96
 
-    player = Player(100, 100, 57, 93)
+    player = Player(100, 100, 60, 96)
     fire = Fire(100, HEIGHT - block_size - 64,16, 32)
     fire.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
