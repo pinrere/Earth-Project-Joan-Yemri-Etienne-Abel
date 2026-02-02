@@ -11,7 +11,7 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
-WIDTH, HEIGHT = 1000, 800
+WIDTH, HEIGHT = 1200, 800
 FPS = 60
 PLAYER_VEL = 5
 
@@ -101,7 +101,7 @@ class Player(pygame.sprite.Sprite):
         self.sprite_offset_y = 50
 
     def jump(self):
-        self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut suater moins haut
+        self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut sauter moins haut
         self.animation_count = 0
         self.jump_count += 1
         if self.jump_count == 1:
@@ -129,7 +129,7 @@ class Player(pygame.sprite.Sprite):
             self.animation_count = 0
 
     def loop(self, fps):
-        self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
+        self.y_vel += min(0.4, (self.fall_count / fps) * self.GRAVITY)
         self.move(self.x_vel, self.y_vel)
 
         if self.hit:
