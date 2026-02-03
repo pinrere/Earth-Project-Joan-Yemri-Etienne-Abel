@@ -355,7 +355,9 @@ def main(window):
 
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
-        scroll -= player.x_vel
+        if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
+                (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
+            scroll -= player.x_vel
         if abs(scroll) > width_bg:
             scroll = 0
 
