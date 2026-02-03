@@ -211,34 +211,6 @@ class Block(Object):
         block = get_block(size)
         self.image.blit(block, (0,0))
 
-class Fire(Object):
-    ANIMATION_DELAY = 3
-
-    def __init__(self, x, y, width, height):
-        super().__init__(x, y, width, height, "fire")
-        self.fire = load_sprite_sheets("Traps", "Fire", width, height)
-        self.image = self.fire["on"][0]
-        self.animation_count = 0
-        self.animation_name = "on"
-
-    def on(self):
-        self.animation_name = "on"
-
-    def off(self):
-        self.animation_name = "off"
-
-    def loop(self):
-        sprites = self.fire[self.animation_name]
-        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
-        self.image = sprites[sprite_index]
-        self.animation_count += 1
-
-        self.rect = self.image.get_rect(topleft=(self.rect.x, self.rect.y))
-
-        if self.animation_count // self.ANIMATION_DELAY > len(sprites):
-            self.animation_count = 0
-
-
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect()
@@ -318,20 +290,44 @@ def handle_move(player, objects):
 
 def main(window):
     clock = pygame.time.Clock()
-    bg_image,width_bg,nb_tiles = get_background("CloudsBG.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
+    bg_image,width_bg,nb_tiles = get_background("Polluted.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
 
     block_size = 96
 
     player = Player(100, 100, 60, 96)
-    fire = Fire(100, HEIGHT - block_size - 64,16, 32)
-    fire.on()
-    floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
-    objects = [*floor, Block(0, HEIGHT - block_size * 2, block_size), Block(block_size * 3, HEIGHT - block_size * 4, 10), Block(
-        block_size * 4, HEIGHT - block_size * 7, block_size), Block(block_size * 4, HEIGHT - block_size * 7, 10), Block(
-        block_size * 2, HEIGHT - block_size * 4, block_size),Block(block_size * 3, HEIGHT - block_size * 5, 10), Fire(
-        block_size * 4 + 40, HEIGHT - block_size * 7 - 62, 16, 32), Fire(block_size * 3 - 40, HEIGHT - block_size * 5 + 34, 16, 32), Block(
-        block_size * 11, HEIGHT - block_size * 6, block_size), Fire(block_size * 12 - 40, HEIGHT - block_size * 6 - 62, 16, 32), Block(
-        block_size * 8, HEIGHT - block_size * 4, 10)]
+    floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH * 10 // block_size, WIDTH * 10 // block_size)]
+    objects = [
+        *floor,
+
+        Block(-block_size * 6, HEIGHT - block_size * 2, block_size),
+        Block(-block_size * 4, HEIGHT - block_size * 4, block_size),
+        Block(-block_size * 2, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 1, HEIGHT - block_size * 5, block_size),
+
+        Block(block_size * 3, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 5, HEIGHT - block_size * 3, block_size),
+        Block(block_size * 7, HEIGHT - block_size * 6, block_size),
+
+        Block(block_size * 9, HEIGHT - block_size * 4, block_size),
+        Block(block_size * 11, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 13, HEIGHT - block_size * 5, block_size),
+
+        Block(block_size * 15, HEIGHT - block_size * 6, block_size),
+        Block(block_size * 17, HEIGHT - block_size * 2, block_size),
+
+        Block(block_size * 19, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 21, HEIGHT - block_size * 4, block_size),
+
+        Block(block_size * 23, HEIGHT - block_size * 6, block_size),
+        Block(block_size * 25, HEIGHT - block_size * 3, block_size),
+
+        Block(block_size * 27, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 29, HEIGHT - block_size * 5, block_size),
+
+        Block(block_size * 31, HEIGHT - block_size * 6, block_size),
+        Block(block_size * 33, HEIGHT - block_size * 4, block_size),
+        Block(-block_size * 36, HEIGHT - block_size * 2, block_size)
+    ]
 
     offset_x = 0
     scroll_area_width = 200
@@ -351,7 +347,6 @@ def main(window):
                     player.jump()
 
         player.loop(FPS)
-        fire.loop()
         handle_move(player, objects)
 
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
