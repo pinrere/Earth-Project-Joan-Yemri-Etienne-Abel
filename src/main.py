@@ -242,18 +242,16 @@ class Fire(Object):
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect()
-    tiles = []
+    nb_tiles = math.ceil(WIDTH / width) + 2
 
-    for i in range(WIDTH // width + 1):
-        for j in range(HEIGHT // height + 1):
-            pos = (i * width, j * height)
-            tiles.append(pos)
 
-    return tiles, image
+    return image, width, nb_tiles
 
-def draw(window, background, bg_image, player, objects, offset_x):
-    for tile in background:
-        window.blit(bg_image, tile)
+def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x):
+
+    for i in range(-1,nb_tiles):
+        window.blit(bg_image, (i*width_bg + scroll,0))
+
 
     for obj in objects:
         obj.draw(window, offset_x)
@@ -306,7 +304,7 @@ def handle_move(player, objects):
     player.x_vel = 0
     collide_left = collide(player, objects, -PLAYER_VEL * 2)
     collide_right = collide(player, objects, PLAYER_VEL * 2)
-    if keys[pygame.K_q] and not collide_left:
+    if keys[pygame.K_s] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
@@ -320,7 +318,7 @@ def handle_move(player, objects):
 
 def main(window):
     clock = pygame.time.Clock()
-    background, bg_image = get_background("Blue.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
+    bg_image,width_bg,nb_tiles = get_background("CloudsBG.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
 
     block_size = 96
 
@@ -336,6 +334,7 @@ def main(window):
 
     offset_x = 0
     scroll_area_width = 200
+    scroll = 0
 
     run = True
     while run:
@@ -353,7 +352,12 @@ def main(window):
         player.loop(FPS)
         fire.loop()
         handle_move(player, objects)
-        draw(window, background, bg_image, player, objects, offset_x)
+
+        draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
+
+        scroll -= player.x_vel
+        if abs(scroll) > width_bg:
+            scroll = 0
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
