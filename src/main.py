@@ -11,7 +11,7 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
-WIDTH, HEIGHT = 1000, 800
+WIDTH, HEIGHT = 1200, 800
 FPS = 60
 PLAYER_VEL = 5
 
@@ -97,11 +97,11 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
-        self.sprite_offset_x = 69
-        self.sprite_offset_y = 52
+        self.sprite_offset_x = 67
+        self.sprite_offset_y = 50
 
     def jump(self):
-        self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut suater moins haut
+        self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut sauter moins haut
         self.animation_count = 0
         self.jump_count += 1
         if self.jump_count == 1:
@@ -129,7 +129,7 @@ class Player(pygame.sprite.Sprite):
             self.animation_count = 0
 
     def loop(self, fps):
-        self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
+        self.y_vel += min(0.4, (self.fall_count / fps) * self.GRAVITY)
         self.move(self.x_vel, self.y_vel)
 
         if self.hit:
@@ -152,18 +152,26 @@ class Player(pygame.sprite.Sprite):
 
     def update_sprite(self):
         sprite_sheet = "idle"
+        self.sprite_offset_y = 50
+        self.sprite_offset_x = 67
 
         if self.hit:
             sprite_sheet = "hit"
 
         elif self.y_vel < 0:
             sprite_sheet = "jump"
+            self.sprite_offset_y = 34
 
         elif self.y_vel > self.GRAVITY:
             sprite_sheet = "fall"
+            self.sprite_offset_y = 34
 
         elif self.x_vel != 0:
             sprite_sheet = "run"
+            if self.direction == "right":
+                self.sprite_offset_x += 6
+            else:
+                self.sprite_offset_x -= 6
 
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
@@ -234,18 +242,16 @@ class Fire(Object):
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect()
-    tiles = []
+    nb_tiles = math.ceil(WIDTH / width) + 2
 
-    for i in range(WIDTH // width + 1):
-        for j in range(HEIGHT // height + 1):
-            pos = (i * width, j * height)
-            tiles.append(pos)
 
-    return tiles, image
+    return image, width, nb_tiles
 
-def draw(window, background, bg_image, player, objects, offset_x):
-    for tile in background:
-        window.blit(bg_image, tile)
+def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x):
+
+    for i in range(-1,nb_tiles):
+        window.blit(bg_image, (i*width_bg + scroll,0))
+
 
     for obj in objects:
         obj.draw(window, offset_x)
@@ -298,7 +304,7 @@ def handle_move(player, objects):
     player.x_vel = 0
     collide_left = collide(player, objects, -PLAYER_VEL * 2)
     collide_right = collide(player, objects, PLAYER_VEL * 2)
-    if keys[pygame.K_q] and not collide_left:
+    if keys[pygame.K_s] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
@@ -312,11 +318,11 @@ def handle_move(player, objects):
 
 def main(window):
     clock = pygame.time.Clock()
-    background, bg_image = get_background("Blue.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
+    bg_image,width_bg,nb_tiles = get_background("CloudsBG.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
 
     block_size = 96
 
-    player = Player(100, 100, 57, 93)
+    player = Player(100, 100, 60, 96)
     fire = Fire(100, HEIGHT - block_size - 64,16, 32)
     fire.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
@@ -329,6 +335,7 @@ def main(window):
 
     offset_x = 0
     scroll_area_width = 200
+    scroll = 0
 
     run = True
     while run:
@@ -346,7 +353,12 @@ def main(window):
         player.loop(FPS)
         fire.loop()
         handle_move(player, objects)
-        draw(window, background, bg_image, player, objects, offset_x)
+
+        draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
+
+        scroll -= player.x_vel
+        if abs(scroll) > width_bg:
+            scroll = 0
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
