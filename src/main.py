@@ -209,6 +209,7 @@ class Block(Object):
     def __init__(self, x, y, size):
         super().__init__(x, y, size, size)
         block = get_block(size)
+        self.x = x
         self.image.blit(block, (0,0))
 
 def get_background(name):
@@ -294,6 +295,9 @@ def main(window):
 
     block_size = 96
 
+    generated_until = block_size * 36  #utilisation gen aleatoire
+    segment_length = block_size * 8
+
     player = Player(100, 100, 60, 96)
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH * 10 // block_size, WIDTH * 10 // block_size)]
     objects = [
@@ -326,7 +330,9 @@ def main(window):
 
         Block(block_size * 31, HEIGHT - block_size * 6, block_size),
         Block(block_size * 33, HEIGHT - block_size * 4, block_size),
-        Block(-block_size * 36, HEIGHT - block_size * 2, block_size)
+        Block(-block_size * 36, HEIGHT - block_size * 2, block_size),
+        Block(block_size * 35, HEIGHT - block_size * 4, block_size),
+        Block(block_size * 34, HEIGHT - block_size * 4, block_size)
     ]
 
     offset_x = 0
@@ -360,6 +366,18 @@ def main(window):
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             offset_x += player.x_vel
+
+        #generation blocs aleatoire mettre condition
+        #pour programation plus propre et vers la gauche aussi
+        if player.hitbox.x + WIDTH > generated_until:
+            start_x = generated_until
+            end_x = generated_until + segment_length
+            for i in range(random.randint(3, 7)):
+                x = random.randint(start_x, end_x) // block_size * block_size
+                height_level = random.choice([2, 3, 4, 5, 6])
+                y = HEIGHT - block_size * height_level
+                objects.append(Block(x, y, block_size))
+            generated_until += segment_length
 
     pygame.quit()
     quit()
