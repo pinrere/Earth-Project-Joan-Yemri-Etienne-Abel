@@ -214,6 +214,10 @@ class Block(Object):
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect()
+    tiles = []
+    rect_bas = pygame.Rect(0, 0, width, 350)
+    rect_haut = pygame.Rect(0, 350, width, height)
+    tiles.append(image.subsurface(rect_bas,rect_haut))
     nb_tiles = math.ceil(WIDTH / width) + 2
 
 
@@ -290,7 +294,7 @@ def handle_move(player, objects):
 
 def main(window):
     clock = pygame.time.Clock()
-    bg_image,width_bg,nb_tiles = get_background("Polluted.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
+    bg_image,width_bg,nb_tiles = get_background("BGVert.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
 
     block_size = 96
 
