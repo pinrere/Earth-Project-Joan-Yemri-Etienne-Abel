@@ -282,6 +282,15 @@ class Block(Object):
         self.x = x
         self.image.blit(block, (0,0))
 
+class ShadowBlock(Object):
+    def __init__(self, x, y, width, height):
+        super().__init__(x, y, width, height, "shadow")
+
+        img = pygame.image.load(join("assets", "Other", "Shadow.png")).convert_alpha()
+        img = pygame.transform.scale(img, (width, height))
+
+        self.image.blit(img, (0, 0))
+
 class TrashBag(Object):
     GRAVITY = 1  # intensité de la gravité
 
@@ -326,6 +335,25 @@ class TrashBag(Object):
                     self.x_vel = 0  # Le sac s'arrête de glisser
                     self.is_launched = False
                     break
+
+class TrashBin(Object):
+    def __init__(self, x, y, color):
+        img_map = {
+            "green": "greenBeen.png",
+            "yellow": "yellowBeen.png",
+            "black": "blackBeen.png"
+        }
+
+        img = pygame.image.load(join("assets", "Items", "Waste", img_map[color])).convert_alpha()
+
+        width = img.get_width() * 3
+        height = img.get_height() * 3
+
+        super().__init__(x, y, width, height, "trashbin")
+
+        self.color = color
+        self.image.blit(pygame.transform.scale(img, (width, height)), (0, 0))
+
 
 
 def get_background(name):
@@ -459,10 +487,13 @@ def main(window):
     objects = [
         *floor,
 
-        Block(-block_size * 6, HEIGHT - block_size * 2, block_size),
-        Block(-block_size * 4, HEIGHT - block_size * 4, block_size),
-        Block(-block_size * 2, HEIGHT - block_size * 7, block_size),
-        Block(block_size * 1, HEIGHT - block_size * 5, block_size),
+        TrashBin(-800, HEIGHT - 175, "green"),
+        TrashBin(-640, HEIGHT - 175, "yellow"),
+        TrashBin(-480, HEIGHT - 175, "black"),
+
+        ShadowBlock(-180, 0, 80, HEIGHT),
+
+        Block(block_size * 1, HEIGHT - block_size * 2, block_size),
 
         Block(block_size * 3, HEIGHT - block_size * 7, block_size),
         Block(block_size * 5, HEIGHT - block_size * 3, block_size),
@@ -542,6 +573,7 @@ def main(window):
                 y = HEIGHT - block_size * height_level
                 objects.append(Block(x, y, block_size))
             generated_until += segment_length
+
 
     pygame.quit()
     quit()
