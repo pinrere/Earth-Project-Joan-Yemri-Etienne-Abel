@@ -237,6 +237,20 @@ class Block(Object):
         self.x = x
         self.image.blit(block, (0,0))
 
+class TrashBag(Object):
+    def __init__(self, x, y):
+        width = 18 * 3   # scale x3
+        height = 25 * 3
+
+        super().__init__(x, y, width, height, "trashbag")
+
+        image = pygame.image.load(join("assets", "Items", "Waste", "trashBag.png")).convert_alpha()
+        image = pygame.transform.scale(image, (width, height))
+
+        self.image.blit(image, (0, 0))
+
+        self.collected = False
+
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect()
@@ -357,7 +371,11 @@ def main(window):
         Block(block_size * 33, HEIGHT - block_size * 4, block_size),
         Block(-block_size * 36, HEIGHT - block_size * 2, block_size),
         Block(block_size * 35, HEIGHT - block_size * 4, block_size),
-        Block(block_size * 34, HEIGHT - block_size * 4, block_size)
+        Block(block_size * 34, HEIGHT - block_size * 4, block_size),
+
+        TrashBag(block_size * 5, HEIGHT - block_size * 4 - 75),
+        TrashBag(block_size * 13, HEIGHT - block_size * 6 - 75),
+        TrashBag(block_size * 22, HEIGHT - block_size * 5 - 75)
     ]
 
     offset_x = 0
