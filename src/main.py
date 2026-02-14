@@ -127,6 +127,31 @@ class Player(pygame.sprite.Sprite):
 
         pygame.draw.rect(win, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height), 2)
 
+    def draw_trajectory(self, win, offset_x):
+        # On affiche la trajectoire seulement si SHIFT est pressé et qu'on a des sacs
+        keys = pygame.key.get_pressed()
+        if not (keys[pygame.K_LSHIFT] and self.trash_collected > 0):
+            return
+
+        # Point de départ : centre du joueur
+        start_x = self.hitbox.centerx - offset_x
+        start_y = self.hitbox.centery
+
+        # Calcul du vecteur force basé sur la position de la souris
+        m_x, m_y = pygame.mouse.get_pos()
+        # On divise par 10 pour que la puissance ne soit pas démesurée
+        vel_x = (m_x - start_x) * 0.1
+        vel_y = (m_y - start_y) * 0.1
+
+        # Simulation de la courbe
+        for i in range(1, 15):
+            t = i * 1.5  # Intervalle de temps simulé
+            # Formule : Position = Vitesse * Temps + 0.5 * Gravité * Temps^2
+            px = start_x + vel_x * t
+            py = start_y + vel_y * t + 0.5 * TrashBag.GRAVITY * (t ** 2)
+
+            pygame.draw.circle(win, (255, 255, 255), (int(px), int(py)), 2)
+
     def draw_trash_bar(self, win, offset_x):
         bar_x = self.hitbox.x - offset_x
         bar_y = self.hitbox.y - 30  # au-dessus de la barre de vie
@@ -261,21 +286,19 @@ class Block(Object):
 class TrashBag(Object):
     GRAVITY = 1  # intensité de la gravité
 
-    def __init__(self, x, y):
-        width = 18 * 3   # scale x3
+    def __init__(self, x, y, vel_x=0, vel_y=0):
+        width = 18 * 3
         height = 25 * 3
-        self.name = "trashbag"
-
         super().__init__(x, y, width, height, "trashbag")
 
-        image = pygame.image.load(join("assets", "Items", "Waste", "trashBag.png")).convert_alpha()
-        image = pygame.transform.scale(image, (width, height))
-
-        self.image.blit(image, (0, 0))
+        # Chargement de l'image
+        img = pygame.image.load(join("assets", "Items", "Waste", "trashBag.png")).convert_alpha()
+        self.image.blit(pygame.transform.scale(img, (width, height)), (0, 0))
 
         self.collected = False
-
-        self.y_vel = 0
+        self.y_vel = vel_y  # Vitesse verticale initiale
+        self.x_vel = vel_x  # Vitesse horizontale initiale
+        self.is_launched = (vel_x != 0 or vel_y != 0)
 
     def hit_vertical(self, objects):
         self.rect.y += self.y_vel
@@ -287,9 +310,24 @@ class TrashBag(Object):
                     break
 
     def update(self, objects):
-        # applique la gravité
+        # 1. On applique la gravité à la vitesse
         self.y_vel += self.GRAVITY
-        self.hit_vertical(objects)
+
+        # 2. On déplace le sac selon ses vitesses
+        self.rect.y += self.y_vel
+        self.rect.x += self.x_vel
+
+        # 3. On gère les collisions avec les blocs
+        for obj in objects:
+            if isinstance(obj, Block) and self.rect.colliderect(obj.rect):
+                # Collision par le haut (le sac se pose)
+                if self.y_vel > 0:
+                    self.rect.bottom = obj.rect.top
+                    self.y_vel = 0
+                    self.x_vel = 0  # Le sac s'arrête de glisser
+                    self.is_launched = False
+                    break
+
 
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
@@ -318,6 +356,7 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
     player.draw(window, offset_x)
     player.draw_health_bar(window, offset_x)
     player.draw_trash_bar(window, offset_x)
+    player.draw_trajectory(window, offset_x)
     pygame.display.update()
 
 def handle_vertical_collision(player, objects, dy):
@@ -352,29 +391,60 @@ def collide(player, objects, dx):
     player.rect.topleft = player.hitbox.topleft
     return collided_object
 
-def handle_move(player, objects):
+
+def handle_move(player, objects, offset_x):  # Ajout de offset_x ici
     keys = pygame.key.get_pressed()
+    mouse_buttons = pygame.mouse.get_pressed()
 
     player.x_vel = 0
     collide_left = collide(player, objects, -PLAYER_VEL * 2)
     collide_right = collide(player, objects, PLAYER_VEL * 2)
+
+    # Déplacement (Q et D)
     if keys[pygame.K_q] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
 
+    # Collisions verticales
     vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
     to_check = [collide_left, collide_right, *vertical_collide]
 
-    for obj in to_check[:]:
+    for obj in to_check:
         if obj is None:
             continue
 
         if obj.name == "fire":
             player.make_hit()
 
+        # COLLECTE : Ramasser le sac avec E
         if obj.name == "trashbag" and keys[pygame.K_e]:
-            player.collect_trash(obj, objects)
+            # On vérifie si le sac n'est pas déjà en plein vol
+            if hasattr(obj, 'is_launched') and not obj.is_launched:
+                player.collect_trash(obj, objects)
+
+    # LANCER : Shift + Clic Gauche
+    if keys[pygame.K_LSHIFT] and player.trash_collected > 0:
+        if mouse_buttons[0]:  # Clic gauche enfoncé
+            m_x, m_y = pygame.mouse.get_pos()
+
+            # Ajustement de la position de la souris par rapport au scrolling
+            # start_x est la position du joueur à l'écran
+            start_x = player.hitbox.centerx - offset_x
+            start_y = player.hitbox.centery
+
+            # Calcul de la force (multiplié par 0.1 pour un lancer réaliste)
+            v_x = (m_x - start_x) * 0.08
+            v_y = (m_y - start_y) * 0.08
+
+            # Création du sac avec les vitesses initiales
+            launched_bag = TrashBag(player.hitbox.centerx, player.hitbox.centery, v_x, v_y)
+            objects.append(launched_bag)
+
+            player.trash_collected -= 1
+
+            # Petit délai pour éviter de spammer les lancers
+            pygame.time.delay(200)
 
 
 def main(window):
@@ -446,7 +516,7 @@ def main(window):
                     player.jump()
 
         player.loop(FPS)
-        handle_move(player, objects)
+        handle_move(player, objects, offset_x)
         for obj in objects:
             if isinstance(obj, TrashBag):
                 obj.update(objects)
