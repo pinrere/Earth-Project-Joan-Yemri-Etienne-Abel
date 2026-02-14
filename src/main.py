@@ -128,27 +128,26 @@ class Player(pygame.sprite.Sprite):
         pygame.draw.rect(win, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height), 2)
 
     def draw_trajectory(self, win, offset_x):
-        # On affiche la trajectoire seulement si SHIFT est pressé et qu'on a des sacs
         keys = pygame.key.get_pressed()
         if not (keys[pygame.K_LSHIFT] and self.trash_collected > 0):
             return
 
-        # Point de départ : centre du joueur
         start_x = self.hitbox.centerx - offset_x
         start_y = self.hitbox.centery
 
-        # Calcul du vecteur force basé sur la position de la souris
         m_x, m_y = pygame.mouse.get_pos()
-        # On divise par 10 pour que la puissance ne soit pas démesurée
-        vel_x = (m_x - start_x) * 0.1
-        vel_y = (m_y - start_y) * 0.1
 
-        # Simulation de la courbe
+        vx = (m_x - start_x) * 0.05
+        vy = (m_y - start_y) * 0.1
+
+        MAX_SPEED = 30
+        vx = max(min(vx, MAX_SPEED), -MAX_SPEED)
+        vy = max(min(vy, MAX_SPEED), -MAX_SPEED)
+
         for i in range(1, 15):
-            t = i * 1.5  # Intervalle de temps simulé
-            # Formule : Position = Vitesse * Temps + 0.5 * Gravité * Temps^2
-            px = start_x + vel_x * t
-            py = start_y + vel_y * t + 0.5 * TrashBag.GRAVITY * (t ** 2)
+            t = i * 1.5
+            px = start_x + vx * t
+            py = start_y + vy * t + 0.5 * TrashBag.GRAVITY * (t ** 2)
 
             pygame.draw.circle(win, (255, 255, 255), (int(px), int(py)), 2)
 
