@@ -101,6 +101,11 @@ class Player(pygame.sprite.Sprite):
         self.sprite_offset_y = 50
         self.max_health = 100
         self.health = 100
+        self.trash_collected = 0
+        self.MAX_TRASH = 3
+        # Pour l'affichage des carrés des déchets
+        self.trash_icon_size = 8  # taille des carrés
+        self.trash_icon_spacing = 7  # espace entre les carrés
 
     def draw_health_bar(self, win, offset_x):
         bar_x = self.hitbox.x - offset_x
@@ -122,6 +127,16 @@ class Player(pygame.sprite.Sprite):
 
         pygame.draw.rect(win, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height), 2)
 
+    def draw_trash_bar(self, win, offset_x):
+        bar_x = self.hitbox.x - offset_x
+        bar_y = self.hitbox.y - 30  # au-dessus de la barre de vie
+
+        for i in range(self.MAX_TRASH):
+            x = bar_x + i * (self.trash_icon_size + self.trash_icon_spacing) + 10
+            y = bar_y
+            color = (255, 30, 45) if i < self.trash_collected else (50, 50, 50)  # vert si collecté, gris sinon
+            pygame.draw.rect(win, color, (x, y, self.trash_icon_size, self.trash_icon_size))
+            pygame.draw.rect(win, (0, 0, 0), (x, y, self.trash_icon_size, self.trash_icon_size), 2)  # bordure noire
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut sauter moins haut
@@ -215,7 +230,13 @@ class Player(pygame.sprite.Sprite):
              self.hitbox.y - self.sprite_offset_y)
         )
 
-
+    def collect_trash(self, obj, objects):
+        if self.trash_collected < self.MAX_TRASH:
+            self.trash_collected += 1
+            if obj in objects:
+                objects.remove(obj)
+            return True  # pour savoir qu’on a collecté
+        return False
 
 
 class Object(pygame.sprite.Sprite):
@@ -238,6 +259,8 @@ class Block(Object):
         self.image.blit(block, (0,0))
 
 class TrashBag(Object):
+    GRAVITY = 1  # intensité de la gravité
+
     def __init__(self, x, y):
         width = 18 * 3   # scale x3
         height = 25 * 3
@@ -251,6 +274,22 @@ class TrashBag(Object):
         self.image.blit(image, (0, 0))
 
         self.collected = False
+
+        self.y_vel = 0
+
+    def hit_vertical(self, objects):
+        self.rect.y += self.y_vel
+        for obj in objects:
+            if isinstance(obj, Block):  # ← collision seulement avec les blocs
+                if self.rect.colliderect(obj.rect):
+                    self.rect.bottom = obj.rect.top
+                    self.y_vel = 0
+                    break
+
+    def update(self, objects):
+        # applique la gravité
+        self.y_vel += self.GRAVITY
+        self.hit_vertical(objects)
 
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
@@ -278,6 +317,7 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
     )
     player.draw(window, offset_x)
     player.draw_health_bar(window, offset_x)
+    player.draw_trash_bar(window, offset_x)
     pygame.display.update()
 
 def handle_vertical_collision(player, objects, dy):
@@ -326,12 +366,15 @@ def handle_move(player, objects):
     vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
     to_check = [collide_left, collide_right, *vertical_collide]
 
-    for obj in to_check:
-        if obj and obj.name == "trashbag" and keys[pygame.K_e]:
-            obj.collected = True
-            # Supprime complètement de la map pour enlever hitbox
-            if obj in objects:
-                objects.remove(obj)
+    for obj in to_check[:]:
+        if obj is None:
+            continue
+
+        if obj.name == "fire":
+            player.make_hit()
+
+        if obj.name == "trashbag" and keys[pygame.K_e]:
+            player.collect_trash(obj, objects)
 
 
 def main(window):
@@ -381,7 +424,8 @@ def main(window):
 
         TrashBag(block_size * 5, HEIGHT - block_size * 4 - 75),
         TrashBag(block_size * 13, HEIGHT - block_size * 6 - 75),
-        TrashBag(block_size * 22, HEIGHT - block_size * 5 - 75)
+        TrashBag(block_size * 22, HEIGHT - block_size * 5 - 75),
+        TrashBag(block_size * 27, HEIGHT - block_size * 3 - 75),
     ]
 
     offset_x = 0
@@ -403,6 +447,9 @@ def main(window):
 
         player.loop(FPS)
         handle_move(player, objects)
+        for obj in objects:
+            if isinstance(obj, TrashBag):
+                obj.update(objects)
 
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
