@@ -417,33 +417,33 @@ def handle_move(player, objects, offset_x):  # Ajout de offset_x ici
         if obj.name == "fire":
             player.make_hit()
 
-        # COLLECTE : Ramasser le sac avec E
         if obj.name == "trashbag" and keys[pygame.K_e]:
-            # On vérifie si le sac n'est pas déjà en plein vol
+
             if hasattr(obj, 'is_launched') and not obj.is_launched:
                 player.collect_trash(obj, objects)
 
-    # LANCER : Shift + Clic Gauche
     if keys[pygame.K_LSHIFT] and player.trash_collected > 0:
-        if mouse_buttons[0]:  # Clic gauche enfoncé
+        if mouse_buttons[0]:
             m_x, m_y = pygame.mouse.get_pos()
 
-            # Ajustement de la position de la souris par rapport au scrolling
-            # start_x est la position du joueur à l'écran
             start_x = player.hitbox.centerx - offset_x
             start_y = player.hitbox.centery
 
-            # Calcul de la force (multiplié par 0.1 pour un lancer réaliste)
-            v_x = (m_x - start_x) * 0.08
-            v_y = (m_y - start_y) * 0.08
+            dx = m_x - start_x
+            dy = m_y - start_y
 
-            # Création du sac avec les vitesses initiales
+            MAX_SPEED = 20
+
+            v_x = dx * 0.08
+            v_y = dy * 0.08
+
+            v_x = max(min(v_x, MAX_SPEED), -MAX_SPEED)
+            v_y = max(min(v_y, MAX_SPEED), -MAX_SPEED)
+
             launched_bag = TrashBag(player.hitbox.centerx, player.hitbox.centery, v_x, v_y)
             objects.append(launched_bag)
-
             player.trash_collected -= 1
 
-            # Petit délai pour éviter de spammer les lancers
             pygame.time.delay(200)
 
 
