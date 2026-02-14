@@ -241,6 +241,7 @@ class TrashBag(Object):
     def __init__(self, x, y):
         width = 18 * 3   # scale x3
         height = 25 * 3
+        self.name = "trashbag"
 
         super().__init__(x, y, width, height, "trashbag")
 
@@ -264,8 +265,9 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
     for i in range(-1,nb_tiles):
         window.blit(bg_image, (i*width_bg + scroll,0))
 
-
     for obj in objects:
+        if hasattr(obj, "collected") and obj.collected:
+            continue
         obj.draw(window, offset_x)
 
     pygame.draw.rect(
@@ -316,16 +318,20 @@ def handle_move(player, objects):
     player.x_vel = 0
     collide_left = collide(player, objects, -PLAYER_VEL * 2)
     collide_right = collide(player, objects, PLAYER_VEL * 2)
-    if keys[pygame.K_s] and not collide_left:
+    if keys[pygame.K_q] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
 
     vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
     to_check = [collide_left, collide_right, *vertical_collide]
+
     for obj in to_check:
-        if obj and obj.name == "fire":
-            player.make_hit()
+        if obj and obj.name == "trashbag" and keys[pygame.K_e]:
+            obj.collected = True
+            # Supprime complètement de la map pour enlever hitbox
+            if obj in objects:
+                objects.remove(obj)
 
 
 def main(window):
