@@ -99,6 +99,29 @@ class Player(pygame.sprite.Sprite):
         self.hit_count = 0
         self.sprite_offset_x = 67
         self.sprite_offset_y = 50
+        self.max_health = 100
+        self.health = 100
+
+    def draw_health_bar(self, win, offset_x):
+        bar_x = self.hitbox.x - offset_x
+        bar_y = self.hitbox.y - 20
+        bar_width = self.hitbox.width
+        bar_height = 10
+
+        pygame.draw.rect(win, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
+
+        color = (0, 255, 0)
+        if self.health < 50: color = (255, 165, 0)
+        if self.health < 20: color = (255, 0, 0)
+        health_ratio = self.health / self.max_health
+
+        current_health_width = bar_width * health_ratio
+
+        if self.health > 0:
+            pygame.draw.rect(win, color, (bar_x, bar_y, current_health_width, bar_height))
+
+        pygame.draw.rect(win, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height), 2)
+
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut sauter moins haut
@@ -193,6 +216,8 @@ class Player(pygame.sprite.Sprite):
         )
 
 
+
+
 class Object(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, name = None):
         super().__init__()
@@ -236,7 +261,7 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
         2
     )
     player.draw(window, offset_x)
-
+    player.draw_health_bar(window, offset_x)
     pygame.display.update()
 
 def handle_vertical_collision(player, objects, dy):
