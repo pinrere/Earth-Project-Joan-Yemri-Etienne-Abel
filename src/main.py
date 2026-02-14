@@ -391,7 +391,7 @@ def collide(player, objects, dx):
     return collided_object
 
 
-def handle_move(player, objects, offset_x):  # Ajout de offset_x ici
+def handle_move(player, objects, offset_x):
     keys = pygame.key.get_pressed()
     mouse_buttons = pygame.mouse.get_pressed()
 
@@ -399,50 +399,45 @@ def handle_move(player, objects, offset_x):  # Ajout de offset_x ici
     collide_left = collide(player, objects, -PLAYER_VEL * 2)
     collide_right = collide(player, objects, PLAYER_VEL * 2)
 
-    # Déplacement (Q et D)
     if keys[pygame.K_q] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
 
-    # Collisions verticales
     vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
+
     to_check = [collide_left, collide_right, *vertical_collide]
-
     for obj in to_check:
-        if obj is None:
-            continue
-
+        if obj is None: continue
         if obj.name == "fire":
             player.make_hit()
-
         if obj.name == "trashbag" and keys[pygame.K_e]:
-
             if hasattr(obj, 'is_launched') and not obj.is_launched:
                 player.collect_trash(obj, objects)
 
     if keys[pygame.K_LSHIFT] and player.trash_collected > 0:
         if mouse_buttons[0]:
             m_x, m_y = pygame.mouse.get_pos()
-
             start_x = player.hitbox.centerx - offset_x
             start_y = player.hitbox.centery
 
-            dx = m_x - start_x
-            dy = m_y - start_y
+            v_x = (m_x - start_x) * 0.05
+            v_y = (m_y - start_y) * 0.12
 
-            MAX_SPEED = 20
-
-            v_x = dx * 0.08
-            v_y = dy * 0.08
-
+            MAX_SPEED = 30
             v_x = max(min(v_x, MAX_SPEED), -MAX_SPEED)
             v_y = max(min(v_y, MAX_SPEED), -MAX_SPEED)
 
-            launched_bag = TrashBag(player.hitbox.centerx, player.hitbox.centery, v_x, v_y)
-            objects.append(launched_bag)
-            player.trash_collected -= 1
+            spawn_x = player.hitbox.centerx
+            if m_x > start_x:
+                spawn_x += 50
+            else:
+                spawn_x -= 50
 
+            launched_bag = TrashBag(spawn_x, player.hitbox.centery, v_x, v_y)
+            objects.append(launched_bag)
+
+            player.trash_collected -= 1
             pygame.time.delay(200)
 
 
