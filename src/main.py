@@ -91,6 +91,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.hitbox.copy()
         self.x_vel = 0
         self.y_vel = 0
+        self.posx = x
         self.direction = "left"
         self.animation_count = 0
         self.fall_count = 0
@@ -132,10 +133,13 @@ class Player(pygame.sprite.Sprite):
         if not (keys[pygame.K_LSHIFT] and self.trash_collected > 0):
             return
 
-        start_x = self.hitbox.centerx - offset_x
+        m_x, m_y = pygame.mouse.get_pos()
+
+        throw_direction = 1 if m_x > self.hitbox.centerx - offset_x else -1
+        start_x = self.hitbox.centerx - offset_x + throw_direction * 60
         start_y = self.hitbox.centery
 
-        m_x, m_y = pygame.mouse.get_pos()
+
 
         vx = (m_x - start_x) * 0.05
         vy = (m_y - start_y) * 0.1
@@ -144,7 +148,7 @@ class Player(pygame.sprite.Sprite):
         vx = max(min(vx, MAX_SPEED), -MAX_SPEED)
         vy = max(min(vy, MAX_SPEED), -MAX_SPEED)
 
-        for i in range(1, 15):
+        for i in range(1, 22):
             t = i * 1.5
             px = start_x + vx * t
             py = start_y + vy * t + 0.5 * TrashBag.GRAVITY * (t ** 2)
@@ -171,6 +175,7 @@ class Player(pygame.sprite.Sprite):
 
     def move(self, dx, dy):
         self.hitbox.x += dx
+        self.posx += dx
         self.hitbox.y += dy
         self.rect.topleft = self.hitbox.topleft
 
@@ -574,12 +579,19 @@ def main(window):
         TrashBag(block_size * 27, HEIGHT - block_size * 3 - 75),
     ]
 
-    offset_x = 0
     scroll_area_width = 200
+
+    offset_x = 0
     scroll = 0
+    camera_shift_done = False
+    camera_original_offset = offset_x
+    camera_original_scroll = scroll
 
     run = True
     while run:
+
+        print(player.posx)
+
         clock.tick(FPS) #comme ça on est sur que ça tourne en 60fps
 
         for event in pygame.event.get():
@@ -593,6 +605,21 @@ def main(window):
 
         player.loop(FPS)
         handle_move(player, objects, offset_x)
+
+        # Déclenchement du décalage
+        if player.posx == -95 and not camera_shift_done:
+            camera_original_offset = offset_x
+            camera_original_scroll = scroll
+            offset_x -= 800  # décale la caméra
+            scroll -= 800
+            camera_shift_done = True
+
+        # Réinitialisation quand on quitte la position
+        if player.posx != -95 and camera_shift_done:
+            offset_x = camera_original_offset
+            scroll = camera_original_scroll
+            camera_shift_done = False
+
         for obj in objects:
             if isinstance(obj, TrashBag):
                 obj.update(objects)
@@ -600,16 +627,15 @@ def main(window):
             if isinstance(obj, Avion):
                 obj.update(objects)
 
-        if random.randint(1, 180) == 1:
+        """if random.randint(1, 180) == 1:
             spawn_avion(objects, player.hitbox.x)
-
+        """
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             scroll -= player.x_vel
-        if abs(scroll) > width_bg:
-            scroll = 0
+
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
