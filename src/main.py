@@ -472,6 +472,53 @@ def handle_move(player, objects, offset_x):
             player.trash_collected -= 1
             pygame.time.delay(200)
 
+class Avion(Object):
+    WIDTH = 120
+    HEIGHT = 40
+    COLOR = (255, 0, 0)
+
+    def __init__(self, x, y, direction=1, speed=3):
+        super().__init__(x, y, self.WIDTH, self.HEIGHT, "avion")
+        self.direction = direction  # 1 = droite, -1 = gauche
+        self.speed = speed
+        self.reset_drop_timer()
+        self.image.fill(self.COLOR)
+
+    def reset_drop_timer(self):
+        self.drop_timer = random.randint(60, 240)
+
+    def move(self):
+        self.rect.x += self.speed * self.direction
+
+    def try_drop_trash(self, objects):
+        self.drop_timer -= 1
+        if self.drop_timer <= 0:
+            trash_x = self.rect.centerx
+            trash_y = self.rect.bottom
+            trash = TrashBag(trash_x, trash_y, 0, 0)
+            objects.append(trash)
+            self.reset_drop_timer()
+
+    def update(self, objects):
+        self.move()
+        self.try_drop_trash(objects)
+
+    def draw(self, win, offset_x):
+        pygame.draw.rect(
+            win,
+            self.COLOR,
+            (self.rect.x - offset_x, self.rect.y, self.rect.width, self.rect.height)
+        )
+
+def spawn_avion(objects, x):
+    direction = random.choice([-1, 1])
+    if direction == 1:
+        spawn_x = x - 200
+    else:
+        spawn_x = x + WIDTH + 200
+
+    avion = Avion(spawn_x, 0, direction, speed=random.randint(2, 5))
+    objects.append(avion)
 
 def main(window):
     clock = pygame.time.Clock()
@@ -549,6 +596,12 @@ def main(window):
         for obj in objects:
             if isinstance(obj, TrashBag):
                 obj.update(objects)
+
+            if isinstance(obj, Avion):
+                obj.update(objects)
+
+        if random.randint(1, 180) == 1:
+            spawn_avion(objects, player.hitbox.x)
 
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
