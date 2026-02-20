@@ -11,6 +11,7 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
+
 WIDTH, HEIGHT = 1200, 800
 FPS = 60
 PLAYER_VEL = 5
@@ -590,7 +591,6 @@ def main(window):
     run = True
     while run:
 
-        print(player.posx)
 
         clock.tick(FPS) #comme ça on est sur que ça tourne en 60fps
 
@@ -627,9 +627,9 @@ def main(window):
             if isinstance(obj, Avion):
                 obj.update(objects)
 
-        """if random.randint(1, 180) == 1:
+        if random.randint(1, 180) == 1:
             spawn_avion(objects, player.hitbox.x)
-        """
+
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
