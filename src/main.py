@@ -11,7 +11,6 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
-
 WIDTH, HEIGHT = 1200, 800
 FPS = 60
 PLAYER_VEL = 5
@@ -365,10 +364,6 @@ class TrashBin(Object):
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect()
-    tiles = []
-    rect_bas = pygame.Rect(0, 0, width, 350)
-    rect_haut = pygame.Rect(0, 350, width, height)
-    tiles.append(image.subsurface(rect_bas,rect_haut))
     nb_tiles = math.ceil(WIDTH / width) + 2
 
 
@@ -532,7 +527,7 @@ def spawn_avion(objects, x):
 
 def main(window):
     clock = pygame.time.Clock()
-    bg_image,width_bg,nb_tiles = get_background("BGVert.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
+    bg_image,width_bg,nb_tiles = get_background("Polluted.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
 
     block_size = 96
 
@@ -595,6 +590,7 @@ def main(window):
     run = True
     while run:
 
+        print(player.posx)
 
         clock.tick(FPS) #comme ça on est sur que ça tourne en 60fps
 
@@ -631,9 +627,9 @@ def main(window):
             if isinstance(obj, Avion):
                 obj.update(objects)
 
-        if random.randint(1, 180) == 1:
+        """if random.randint(1, 180) == 1:
             spawn_avion(objects, player.hitbox.x)
-
+        """
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
