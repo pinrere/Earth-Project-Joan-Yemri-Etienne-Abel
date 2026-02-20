@@ -528,11 +528,10 @@ def spawn_avion(objects, x):
 
 def main(window):
     clock = pygame.time.Clock()
-    bg_image,width_bg,nb_tiles = get_background("Polluted.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
-
+    bg_image,width_bg,nb_tiles = get_background("Polluted.png")
     block_size = 96
 
-    generated_until = block_size * 36  #utilisation gen aleatoire
+    generated_until = block_size * 36
     segment_length = block_size * 8
 
     player = Player(100, 100, 60, 96)
@@ -592,7 +591,7 @@ def main(window):
     while run:
 
 
-        clock.tick(FPS) #comme ça on est sur que ça tourne en 60fps
+        clock.tick(FPS)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
