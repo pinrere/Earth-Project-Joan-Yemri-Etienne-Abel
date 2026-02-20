@@ -291,6 +291,8 @@ class ShadowBlock(Object):
 
         self.image.blit(img, (0, 0))
 
+
+
 class TrashBag(Object):
     GRAVITY = 1  # intensité de la gravité
 
@@ -578,9 +580,13 @@ def main(window):
     scroll_area_width = 200
     scroll = 0
 
+    camera_shifted = False
+    saved_offset_x = 0
+    saved_scroll = 0
+
     run = True
     while run:
-        clock.tick(FPS) #comme ça on est sur que ça tourne en 60fps
+        clock.tick(FPS)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -593,6 +599,7 @@ def main(window):
 
         player.loop(FPS)
         handle_move(player, objects, offset_x)
+
         for obj in objects:
             if isinstance(obj, TrashBag):
                 obj.update(objects)
@@ -600,23 +607,35 @@ def main(window):
             if isinstance(obj, Avion):
                 obj.update(objects)
 
-        if random.randint(1, 180) == 1:
-            spawn_avion(objects, player.hitbox.x)
+        """if random.randint(1, 180) == 1:
+            spawn_avion(objects, player.hitbox.x)"""
 
+        if player.hitbox.x <= -95 and not camera_shifted:
+            saved_offset_x = offset_x
+            saved_scroll = scroll
+            offset_x -= 800
+            scroll -= 800
+            camera_shifted = True
+
+        elif player.hitbox.x > -95 and camera_shifted:
+            offset_x = saved_offset_x
+            scroll = saved_scroll
+            camera_shifted = False
+
+            # --- AJOUT ETAPE 4 : CAMÉRA NORMALE ---
+        if not camera_shifted:
+            if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
+                    (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
+                offset_x += player.x_vel
+                scroll -= player.x_vel
+
+            if abs(scroll) > width_bg:
+                scroll = 0
+
+        # --- AJOUT ETAPE 5 : DESSIN ---
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
-        if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
-                (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
-            scroll -= player.x_vel
-        if abs(scroll) > width_bg:
-            scroll = 0
-
-        if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
-                (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
-            offset_x += player.x_vel
-
-        #generation blocs aleatoire mettre condition
-        #pour programation plus propre et vers la gauche aussi
+        # --- GÉNÉRATION DES BLOCS ---
         if player.hitbox.x + WIDTH > generated_until:
             start_x = generated_until
             end_x = generated_until + segment_length
