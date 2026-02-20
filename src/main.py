@@ -91,6 +91,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.hitbox.copy()
         self.x_vel = 0
         self.y_vel = 0
+        self.posx = x
         self.direction = "left"
         self.animation_count = 0
         self.fall_count = 0
@@ -99,6 +100,71 @@ class Player(pygame.sprite.Sprite):
         self.hit_count = 0
         self.sprite_offset_x = 67
         self.sprite_offset_y = 50
+        self.max_health = 100
+        self.health = 100
+        self.trash_collected = 0
+        self.MAX_TRASH = 3
+        # Pour l'affichage des carrés des déchets
+        self.trash_icon_size = 8  # taille des carrés
+        self.trash_icon_spacing = 7  # espace entre les carrés
+
+    def draw_health_bar(self, win, offset_x):
+        bar_x = self.hitbox.x - offset_x
+        bar_y = self.hitbox.y - 20
+        bar_width = self.hitbox.width
+        bar_height = 10
+
+        pygame.draw.rect(win, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
+
+        color = (0, 255, 0)
+        if self.health < 50: color = (255, 165, 0)
+        if self.health < 20: color = (255, 0, 0)
+        health_ratio = self.health / self.max_health
+
+        current_health_width = bar_width * health_ratio
+
+        if self.health > 0:
+            pygame.draw.rect(win, color, (bar_x, bar_y, current_health_width, bar_height))
+
+        pygame.draw.rect(win, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height), 2)
+
+    def draw_trajectory(self, win, offset_x):
+        keys = pygame.key.get_pressed()
+        if not (keys[pygame.K_LSHIFT] and self.trash_collected > 0):
+            return
+
+        m_x, m_y = pygame.mouse.get_pos()
+
+        throw_direction = 1 if m_x > self.hitbox.centerx - offset_x else -1
+        start_x = self.hitbox.centerx - offset_x + throw_direction * 60
+        start_y = self.hitbox.centery
+
+
+
+        vx = (m_x - start_x) * 0.05
+        vy = (m_y - start_y) * 0.1
+
+        MAX_SPEED = 30
+        vx = max(min(vx, MAX_SPEED), -MAX_SPEED)
+        vy = max(min(vy, MAX_SPEED), -MAX_SPEED)
+
+        for i in range(1, 22):
+            t = i * 1.5
+            px = start_x + vx * t
+            py = start_y + vy * t + 0.5 * TrashBag.GRAVITY * (t ** 2)
+
+            pygame.draw.circle(win, (255, 255, 255), (int(px), int(py)), 2)
+
+    def draw_trash_bar(self, win, offset_x):
+        bar_x = self.hitbox.x - offset_x
+        bar_y = self.hitbox.y - 30  # au-dessus de la barre de vie
+
+        for i in range(self.MAX_TRASH):
+            x = bar_x + i * (self.trash_icon_size + self.trash_icon_spacing) + 10
+            y = bar_y
+            color = (255, 30, 45) if i < self.trash_collected else (50, 50, 50)  # vert si collecté, gris sinon
+            pygame.draw.rect(win, color, (x, y, self.trash_icon_size, self.trash_icon_size))
+            pygame.draw.rect(win, (0, 0, 0), (x, y, self.trash_icon_size, self.trash_icon_size), 2)  # bordure noire
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut sauter moins haut
@@ -109,6 +175,7 @@ class Player(pygame.sprite.Sprite):
 
     def move(self, dx, dy):
         self.hitbox.x += dx
+        self.posx += dx
         self.hitbox.y += dy
         self.rect.topleft = self.hitbox.topleft
 
@@ -192,6 +259,14 @@ class Player(pygame.sprite.Sprite):
              self.hitbox.y - self.sprite_offset_y)
         )
 
+    def collect_trash(self, obj, objects):
+        if self.trash_collected < self.MAX_TRASH:
+            self.trash_collected += 1
+            if obj in objects:
+                objects.remove(obj)
+            return True  # pour savoir qu’on a collecté
+        return False
+
 
 class Object(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, name = None):
@@ -209,7 +284,82 @@ class Block(Object):
     def __init__(self, x, y, size):
         super().__init__(x, y, size, size)
         block = get_block(size)
+        self.x = x
         self.image.blit(block, (0,0))
+
+class ShadowBlock(Object):
+    def __init__(self, x, y, width, height):
+        super().__init__(x, y, width, height, "shadow")
+
+        img = pygame.image.load(join("assets", "Other", "Shadow.png")).convert_alpha()
+        img = pygame.transform.scale(img, (width, height))
+
+        self.image.blit(img, (0, 0))
+
+class TrashBag(Object):
+    GRAVITY = 1  # intensité de la gravité
+
+    def __init__(self, x, y, vel_x=0, vel_y=0):
+        width = 18 * 3
+        height = 25 * 3
+        super().__init__(x, y, width, height, "trashbag")
+
+        # Chargement de l'image
+        img = pygame.image.load(join("assets", "Items", "Waste", "trashBag.png")).convert_alpha()
+        self.image.blit(pygame.transform.scale(img, (width, height)), (0, 0))
+
+        self.collected = False
+        self.y_vel = vel_y  # Vitesse verticale initiale
+        self.x_vel = vel_x  # Vitesse horizontale initiale
+        self.is_launched = (vel_x != 0 or vel_y != 0)
+
+    def hit_vertical(self, objects):
+        self.rect.y += self.y_vel
+        for obj in objects:
+            if isinstance(obj, Block):  # ← collision seulement avec les blocs
+                if self.rect.colliderect(obj.rect):
+                    self.rect.bottom = obj.rect.top
+                    self.y_vel = 0
+                    break
+
+    def update(self, objects):
+        # 1. On applique la gravité à la vitesse
+        self.y_vel += self.GRAVITY
+
+        # 2. On déplace le sac selon ses vitesses
+        self.rect.y += self.y_vel
+        self.rect.x += self.x_vel
+
+        # 3. On gère les collisions avec les blocs
+        for obj in objects:
+            if isinstance(obj, Block) and self.rect.colliderect(obj.rect):
+                # Collision par le haut (le sac se pose)
+                if self.y_vel > 0:
+                    self.rect.bottom = obj.rect.top
+                    self.y_vel = 0
+                    self.x_vel = 0  # Le sac s'arrête de glisser
+                    self.is_launched = False
+                    break
+
+class TrashBin(Object):
+    def __init__(self, x, y, color):
+        img_map = {
+            "green": "greenBeen.png",
+            "yellow": "yellowBeen.png",
+            "black": "blackBeen.png"
+        }
+
+        img = pygame.image.load(join("assets", "Items", "Waste", img_map[color])).convert_alpha()
+
+        width = img.get_width() * 3
+        height = img.get_height() * 3
+
+        super().__init__(x, y, width, height, "trashbin")
+
+        self.color = color
+        self.image.blit(pygame.transform.scale(img, (width, height)), (0, 0))
+
+
 
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
@@ -228,8 +378,9 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
     for i in range(-1,nb_tiles):
         window.blit(bg_image, (i*width_bg + scroll,0))
 
-
     for obj in objects:
+        if hasattr(obj, "collected") and obj.collected:
+            continue
         obj.draw(window, offset_x)
 
     pygame.draw.rect(
@@ -239,7 +390,9 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
         2
     )
     player.draw(window, offset_x)
-
+    player.draw_health_bar(window, offset_x)
+    player.draw_trash_bar(window, offset_x)
+    player.draw_trajectory(window, offset_x)
     pygame.display.update()
 
 def handle_vertical_collision(player, objects, dy):
@@ -274,23 +427,107 @@ def collide(player, objects, dx):
     player.rect.topleft = player.hitbox.topleft
     return collided_object
 
-def handle_move(player, objects):
+
+def handle_move(player, objects, offset_x):
     keys = pygame.key.get_pressed()
+    mouse_buttons = pygame.mouse.get_pressed()
 
     player.x_vel = 0
     collide_left = collide(player, objects, -PLAYER_VEL * 2)
     collide_right = collide(player, objects, PLAYER_VEL * 2)
-    if keys[pygame.K_s] and not collide_left:
+
+    if keys[pygame.K_q] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
 
     vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
-    to_check = [collide_left, collide_right, *vertical_collide]
-    for obj in to_check:
-        if obj and obj.name == "fire":
-            player.make_hit()
 
+    to_check = set([collide_left, collide_right, *vertical_collide])
+
+    for obj in to_check:
+        if obj is None: continue
+        if obj.name == "fire":
+            player.make_hit()
+        if obj.name == "trashbag" and keys[pygame.K_e]:
+            if hasattr(obj, 'is_launched') and not obj.is_launched:
+
+                if player.collect_trash(obj, objects):
+                    break
+
+    if keys[pygame.K_LSHIFT] and player.trash_collected > 0:
+        if mouse_buttons[0]:
+            m_x, m_y = pygame.mouse.get_pos()
+
+            player_screen_x = player.hitbox.centerx - offset_x
+
+            v_x = (m_x - player_screen_x) * 0.05
+            v_y = (m_y - player.hitbox.centery) * 0.12
+
+            MAX_SPEED = 30
+            v_x = max(min(v_x, MAX_SPEED), -MAX_SPEED)
+            v_y = max(min(v_y, MAX_SPEED), -MAX_SPEED)
+
+            if m_x > player_screen_x:
+                spawn_x = player.hitbox.right + 10
+            else:
+                spawn_x = player.hitbox.left - 60
+
+            spawn_y = player.hitbox.top + 10
+
+            launched_bag = TrashBag(spawn_x, spawn_y, v_x, v_y)
+            objects.append(launched_bag)
+
+            player.trash_collected -= 1
+            pygame.time.delay(200)
+
+class Avion(Object):
+    WIDTH = 120
+    HEIGHT = 40
+    COLOR = (255, 0, 0)
+
+    def __init__(self, x, y, direction=1, speed=3):
+        super().__init__(x, y, self.WIDTH, self.HEIGHT, "avion")
+        self.direction = direction  # 1 = droite, -1 = gauche
+        self.speed = speed
+        self.reset_drop_timer()
+        self.image.fill(self.COLOR)
+
+    def reset_drop_timer(self):
+        self.drop_timer = random.randint(60, 240)
+
+    def move(self):
+        self.rect.x += self.speed * self.direction
+
+    def try_drop_trash(self, objects):
+        self.drop_timer -= 1
+        if self.drop_timer <= 0:
+            trash_x = self.rect.centerx
+            trash_y = self.rect.bottom
+            trash = TrashBag(trash_x, trash_y, 0, 0)
+            objects.append(trash)
+            self.reset_drop_timer()
+
+    def update(self, objects):
+        self.move()
+        self.try_drop_trash(objects)
+
+    def draw(self, win, offset_x):
+        pygame.draw.rect(
+            win,
+            self.COLOR,
+            (self.rect.x - offset_x, self.rect.y, self.rect.width, self.rect.height)
+        )
+
+def spawn_avion(objects, x):
+    direction = random.choice([-1, 1])
+    if direction == 1:
+        spawn_x = x - 200
+    else:
+        spawn_x = x + WIDTH + 200
+
+    avion = Avion(spawn_x, 0, direction, speed=random.randint(2, 5))
+    objects.append(avion)
 
 def main(window):
     clock = pygame.time.Clock()
@@ -298,15 +535,21 @@ def main(window):
 
     block_size = 96
 
+    generated_until = block_size * 36  #utilisation gen aleatoire
+    segment_length = block_size * 8
+
     player = Player(100, 100, 60, 96)
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH * 10 // block_size, WIDTH * 10 // block_size)]
     objects = [
         *floor,
 
-        Block(-block_size * 6, HEIGHT - block_size * 2, block_size),
-        Block(-block_size * 4, HEIGHT - block_size * 4, block_size),
-        Block(-block_size * 2, HEIGHT - block_size * 7, block_size),
-        Block(block_size * 1, HEIGHT - block_size * 5, block_size),
+        TrashBin(-800, HEIGHT - 175, "green"),
+        TrashBin(-640, HEIGHT - 175, "yellow"),
+        TrashBin(-480, HEIGHT - 175, "black"),
+
+        ShadowBlock(-180, 0, 80, HEIGHT),
+
+        Block(block_size * 1, HEIGHT - block_size * 2, block_size),
 
         Block(block_size * 3, HEIGHT - block_size * 7, block_size),
         Block(block_size * 5, HEIGHT - block_size * 3, block_size),
@@ -330,15 +573,29 @@ def main(window):
 
         Block(block_size * 31, HEIGHT - block_size * 6, block_size),
         Block(block_size * 33, HEIGHT - block_size * 4, block_size),
-        Block(-block_size * 36, HEIGHT - block_size * 2, block_size)
+        Block(-block_size * 36, HEIGHT - block_size * 2, block_size),
+        Block(block_size * 35, HEIGHT - block_size * 4, block_size),
+        Block(block_size * 34, HEIGHT - block_size * 4, block_size),
+
+        TrashBag(block_size * 5, HEIGHT - block_size * 4 - 75),
+        TrashBag(block_size * 13, HEIGHT - block_size * 6 - 75),
+        TrashBag(block_size * 22, HEIGHT - block_size * 5 - 75),
+        TrashBag(block_size * 27, HEIGHT - block_size * 3 - 75),
     ]
 
-    offset_x = 0
     scroll_area_width = 200
+
+    offset_x = 0
     scroll = 0
+    camera_shift_done = False
+    camera_original_offset = offset_x
+    camera_original_scroll = scroll
 
     run = True
     while run:
+
+        print(player.posx)
+
         clock.tick(FPS) #comme ça on est sur que ça tourne en 60fps
 
         for event in pygame.event.get():
@@ -351,19 +608,55 @@ def main(window):
                     player.jump()
 
         player.loop(FPS)
-        handle_move(player, objects)
+        handle_move(player, objects, offset_x)
 
+        # Déclenchement du décalage
+        if player.posx == -95 and not camera_shift_done:
+            camera_original_offset = offset_x
+            camera_original_scroll = scroll
+            offset_x -= 800  # décale la caméra
+            scroll -= 800
+            camera_shift_done = True
+
+        # Réinitialisation quand on quitte la position
+        if player.posx != -95 and camera_shift_done:
+            offset_x = camera_original_offset
+            scroll = camera_original_scroll
+            camera_shift_done = False
+
+        for obj in objects:
+            if isinstance(obj, TrashBag):
+                obj.update(objects)
+
+            if isinstance(obj, Avion):
+                obj.update(objects)
+
+        """if random.randint(1, 180) == 1:
+            spawn_avion(objects, player.hitbox.x)
+        """
         draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             scroll -= player.x_vel
-        if abs(scroll) > width_bg:
-            scroll = 0
+
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             offset_x += player.x_vel
+
+        #generation blocs aleatoire mettre condition
+        #pour programation plus propre et vers la gauche aussi
+        if player.hitbox.x + WIDTH > generated_until:
+            start_x = generated_until
+            end_x = generated_until + segment_length
+            for i in range(random.randint(3, 7)):
+                x = random.randint(start_x, end_x) // block_size * block_size
+                height_level = random.choice([2, 3, 4, 5, 6])
+                y = HEIGHT - block_size * height_level
+                objects.append(Block(x, y, block_size))
+            generated_until += segment_length
+
 
     pygame.quit()
     quit()
