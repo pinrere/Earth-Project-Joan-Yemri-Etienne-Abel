@@ -81,7 +81,7 @@ def get_block(size):
 
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
-    GRAVITY = 1
+    GRAVITY = 0.8
     SPRITES = load_sprites_from_folder("MainCharacters", "MaleChar",3, True)
     ANIMATION_DELAY = 4
 
@@ -163,9 +163,14 @@ class Player(pygame.sprite.Sprite):
             pygame.draw.rect(win, (0, 0, 0), (x, y, self.trash_icon_size, self.trash_icon_size), 2)  # bordure noire
 
     def jump(self):
-        self.y_vel = -self.GRAVITY * 8 #changer la valeur si on veut sauter moins haut
+        if self.jump_count == 0:
+            self.y_vel = -17
+        elif self.jump_count == 1:
+            self.y_vel = -12
+
         self.animation_count = 0
         self.jump_count += 1
+
         if self.jump_count == 1:
             self.fall_count = 0
 
@@ -191,8 +196,16 @@ class Player(pygame.sprite.Sprite):
             self.animation_count = 0
 
     def loop(self, fps):
-        self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
-        self.move(self.x_vel, self.y_vel)
+        # Gravité
+        self.y_vel += self.GRAVITY
+
+        # --- Mouvement horizontal ---
+        self.hitbox.x += self.x_vel
+        self.rect.topleft = self.hitbox.topleft
+
+        # --- Mouvement vertical ---
+        self.hitbox.y += self.y_vel
+        self.rect.topleft = self.hitbox.topleft
 
         if self.hit:
             self.hit_count += 1
@@ -294,7 +307,10 @@ class ShadowBlock(Object):
 
 
 class TrashBag(Object):
-    GRAVITY = 1  # intensité de la gravité
+    GRAVITY = 0.8
+    FRICTION = 0.98
+    BOUNCE_DAMPING = 0.6
+    STOP_THRESHOLD = 1
 
     def __init__(self, x, y, vel_x=0, vel_y=0):
         width = 18 * 3
@@ -308,6 +324,9 @@ class TrashBag(Object):
         self.collected = False
         self.y_vel = vel_y  # Vitesse verticale initiale
         self.x_vel = vel_x  # Vitesse horizontale initiale
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+        self.on_ground = False
         self.is_launched = (vel_x != 0 or vel_y != 0)
 
     def hit_vertical(self, objects):
@@ -320,23 +339,67 @@ class TrashBag(Object):
                     break
 
     def update(self, objects):
-        # 1. On applique la gravité à la vitesse
-        self.y_vel += self.GRAVITY
 
-        # 2. On déplace le sac selon ses vitesses
-        self.rect.y += self.y_vel
-        self.rect.x += self.x_vel
+        # --- GRAVITÉ seulement si pas au sol ---
+        if not self.on_ground:
+            self.y_vel += self.GRAVITY
 
-        # 3. On gère les collisions avec les blocs
+        # --- FRICTION AIR ---
+        self.x_vel *= self.FRICTION
+
+        # =====================
+        #   MOUVEMENT X
+        # =====================
+        self.pos_x += self.x_vel
+        self.rect.x = int(self.pos_x)
+
         for obj in objects:
             if isinstance(obj, Block) and self.rect.colliderect(obj.rect):
-                # Collision par le haut (le sac se pose)
+
+                if self.x_vel > 0:
+                    self.rect.right = obj.rect.left
+                elif self.x_vel < 0:
+                    self.rect.left = obj.rect.right
+
+                self.pos_x = self.rect.x
+
+                # rebond mur
+                self.x_vel *= -self.BOUNCE_DAMPING
+
+        # =====================
+        #   MOUVEMENT Y
+        # =====================
+        self.pos_y += self.y_vel
+        self.rect.y = int(self.pos_y)
+
+        self.on_ground = False
+
+        for obj in objects:
+            if isinstance(obj, Block) and self.rect.colliderect(obj.rect):
+
+                # --- SOL ---
                 if self.y_vel > 0:
                     self.rect.bottom = obj.rect.top
-                    self.y_vel = 0
-                    self.x_vel = 0  # Le sac s'arrête de glisser
-                    self.is_launched = False
-                    break
+                    self.pos_y = self.rect.y
+
+                    self.y_vel *= -self.BOUNCE_DAMPING
+                    self.x_vel *= 0.8
+
+                    # Si rebond trop faible → stop total
+                    if abs(self.y_vel) < self.STOP_THRESHOLD:
+                        self.y_vel = 0
+                        self.x_vel = 0
+                        self.on_ground = True
+
+                # --- PLAFOND ---
+                elif self.y_vel < 0:
+                    self.rect.top = obj.rect.bottom
+                    self.pos_y = self.rect.y
+                    self.y_vel *= -self.BOUNCE_DAMPING
+
+        if self.on_ground:
+            self.is_launched = False
+            self.x_vel *= 0.9  # Friction au sol pour l'arrêter plus vite
 
 class TrashBin(Object):
     def __init__(self, x, y, color):
@@ -388,17 +451,20 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
     player.draw_trajectory(window, offset_x)
     pygame.display.update()
 
-def handle_vertical_collision(player, objects, dy):
+def handle_vertical_collision(player, objects):
     collided = []
 
     for obj in objects:
         if player.hitbox.colliderect(obj.rect):
-            if dy > 0:  # chute
+
+            # Collision sol
+            if player.y_vel > 0:
                 player.hitbox.bottom = obj.rect.top
                 player.y_vel = 0
-                player.fall_count = 0
                 player.jump_count = 0
-            elif dy < 0:  # plafond
+
+            # Collision plafond
+            elif player.y_vel < 0:
                 player.hitbox.top = obj.rect.bottom
                 player.y_vel = 0
 
@@ -426,28 +492,28 @@ def handle_move(player, objects, offset_x):
     mouse_buttons = pygame.mouse.get_pressed()
 
     player.x_vel = 0
-    collide_left = collide(player, objects, -PLAYER_VEL * 2)
-    collide_right = collide(player, objects, PLAYER_VEL * 2)
+    collide_left = collide(player, objects, -PLAYER_VEL)
+    collide_right = collide(player, objects, PLAYER_VEL)
 
     if keys[pygame.K_q] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
 
-    vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
+    collide_down = handle_vertical_collision(player, objects)
+    to_check = set([collide_left, collide_right] + collide_down)
 
-    to_check = set([collide_left, collide_right, *vertical_collide])
+    for obj in objects:
+        if obj.name != "trashbag":
+            continue
 
-    for obj in to_check:
-        if obj is None: continue
-        if obj.name == "fire":
-            player.make_hit()
-        if obj.name == "trashbag" and keys[pygame.K_e]:
-            if hasattr(obj, 'is_launched') and not obj.is_launched:
-
+        # On peut ramasser si le joueur appuie sur E
+        if keys[pygame.K_e]:
+            # On vérifie si le sac est "ramassable" (au sol ou vitesse faible)
+            # On utilise inflate pour créer une zone de détection plus large autour du sac
+            if player.hitbox.colliderect(obj.rect.inflate(20, 20)):
                 if player.collect_trash(obj, objects):
-                    break
-
+                    break  # On en ramasse un seul à la fois
     if keys[pygame.K_LSHIFT] and player.trash_collected > 0:
         if mouse_buttons[0]:
             m_x, m_y = pygame.mouse.get_pos()
@@ -597,8 +663,9 @@ def main(window):
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
 
-        player.loop(FPS)
         handle_move(player, objects, offset_x)
+        player.loop(FPS)
+        handle_vertical_collision(player, objects)
 
         for obj in objects:
             if isinstance(obj, TrashBag):
