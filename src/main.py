@@ -663,6 +663,30 @@ def main(window):
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
 
+        handle_move(player, objects, offset_x)
+        player.loop(FPS)
+        handle_vertical_collision(player, objects)
+
+        for obj in objects:
+            if isinstance(obj, TrashBag):
+                obj.update(objects)
+
+            if isinstance(obj, Avion):
+                obj.update(objects)
+
+        """if random.randint(1, 180) == 1:
+            spawn_avion(objects, player.hitbox.x)"""
+
+        if player.hitbox.x <= -95 and not camera_shifted:
+            saved_offset_x = offset_x
+            saved_scroll = scroll
+            offset_x -= 800
+            scroll -= 800
+            camera_shifted = True
+
+        elif player.hitbox.x > -95 and camera_shifted:
+            offset_x = saved_offset_x
+            scroll = saved_scroll
             camera_shifted = False
 
             # --- AJOUT ETAPE 4 : CAMÉRA NORMALE ---
