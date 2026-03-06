@@ -429,16 +429,20 @@ def get_background(name):
 
     return image, width, nb_tiles
 
-def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x):
 
-    for i in range(-1,nb_tiles):
-        window.blit(bg_image, (i*width_bg + scroll,0))
+def draw(window, bg_parallax, player, objects, offset_x):
+    # 1. On dessine le fond Parallax (remplace la boucle for i in range...)
+    # Cette méthode va blit 'sky', 'houses' et 'road' avec leurs propres calculs de boucle
+    bg_parallax.draw(offset_x)
 
+    # 2. Dessin des objets du monde (inchangé)
     for obj in objects:
         if hasattr(obj, "collected") and obj.collected:
             continue
         obj.draw(window, offset_x)
 
+    # 3. Dessin du joueur et de ses barres d'état (inchangé)
+    # Note : J'ai gardé ta hitbox rouge (rect) pour tes tests
     pygame.draw.rect(
         window,
         (255, 0, 0),
@@ -449,6 +453,7 @@ def draw(window, bg_image,width_bg, nb_tiles, scroll, player, objects, offset_x)
     player.draw_health_bar(window, offset_x)
     player.draw_trash_bar(window, offset_x)
     player.draw_trajectory(window, offset_x)
+
     pygame.display.update()
 
 def handle_vertical_collision(player, objects):
@@ -588,10 +593,42 @@ def spawn_avion(objects, x):
     avion = Avion(spawn_x, 0, direction, speed=random.randint(2, 5))
     objects.append(avion)
 
+
+class ParallaxBackground:
+    def __init__(self, win):
+        self.window = win
+        self.width = win.get_width()
+
+        # Chargement des images (assure-toi qu'elles sont dans assets/Background/)
+        # Ordre : Arrière-plan -> Premier plan
+        self.layers = [
+            {"img": pygame.image.load(join("assets", "Background", "sky.png")).convert_alpha(), "speed": 0.1},
+            {"img": pygame.image.load(join("assets", "Background", "houses.png")).convert_alpha(), "speed": 0.4},
+            {"img": pygame.image.load(join("assets", "Background", "road.png")).convert_alpha(), "speed": 0.7}
+        ]
+
+    def draw(self, offset_x):
+        for layer in self.layers:
+            # On calcule le décalage selon la vitesse du calque
+            # Le modulo (%) permet de faire boucler l'image à l'infini
+            rel_x = (offset_x * layer["speed"]) % self.width
+
+            # On dessine l'image principale
+            self.window.blit(layer["img"], (-rel_x, 0))
+
+            # On dessine une copie à côté pour combler le vide lors du défilement
+            if rel_x > 0:
+                self.window.blit(layer["img"], (self.width - rel_x, 0))
+            else:
+                self.window.blit(layer["img"], (-self.width - rel_x, 0))
+
+
 def main(window):
     clock = pygame.time.Clock()
-    bg_image,width_bg,nb_tiles = get_background("Polluted.png") #pour changer le background, juste changez la couleur. Par exemple écrivez Yellow.png
 
+    parallax_bg = ParallaxBackground(window)
+    offset_x = 0
+    scroll_area_width = 400  # Zone où la caméra commence à suivre le joueur
     block_size = 96
 
     generated_until = block_size * 36  #utilisation gen aleatoire
@@ -696,11 +733,11 @@ def main(window):
                 offset_x += player.x_vel
                 scroll -= player.x_vel
 
-            if abs(scroll) > width_bg:
+            if abs(scroll) > WIDTH:
                 scroll = 0
 
         # --- AJOUT ETAPE 5 : DESSIN ---
-        draw(window, bg_image, width_bg, nb_tiles, scroll, player, objects, offset_x)
+        draw(window, parallax_bg, player, objects, offset_x)
 
         # --- GÉNÉRATION DES BLOCS ---
         if player.hitbox.x + WIDTH > generated_until:
