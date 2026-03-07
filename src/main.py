@@ -271,7 +271,7 @@ class Player(pygame.sprite.Sprite):
     def collect_trash(self, obj, objects):
         if self.trash_collected < self.MAX_TRASH:
             self.trash_collected += 1
-            self.inventory.append(obj.filename) # <--- On stocke le nom du fichier image
+            self.inventory.append((obj.filename, obj.scale)) # <--- On stocke le nom du fichier image
             if obj in objects:
                 objects.remove(obj)
             return True
@@ -313,7 +313,7 @@ class Waste(Object):
     BOUNCE_DAMPING = 0.6
     STOP_THRESHOLD = 1
 
-    def __init__(self, x, y, filename, name="waste", scale=3, vel_x=0, vel_y=0):
+    def __init__(self, x, y, filename, scale=3, name="waste", vel_x=0, vel_y=0):
         path = join("assets", "Items", "Waste", filename)
         img = pygame.image.load(path).convert_alpha()
 
@@ -328,6 +328,7 @@ class Waste(Object):
         self.collected = False
         self.y_vel = vel_y
         self.x_vel = vel_x
+        self.scale = scale
         self.pos_x = float(x)
         self.pos_y = float(y)
         self.on_ground = False
@@ -548,10 +549,10 @@ def handle_move(player, objects, offset_x):
             # --- LOGIQUE DYNAMIQUE ---
             # On récupère le nom du fichier de l'objet ramassé en dernier
             if len(player.inventory) > 0:
-                last_item_file = player.inventory.pop()
+                last_item_file,scale = player.inventory.pop()
 
                 # On crée le nouveau projectile avec la BONNE image
-                launched_item = Waste(spawn_x, spawn_y, last_item_file, vel_x=v_x, vel_y=v_y)
+                launched_item = Waste(spawn_x, spawn_y, last_item_file, scale,vel_x=v_x, vel_y=v_y)
                 objects.append(launched_item)
 
                 player.trash_collected -= 1
@@ -688,7 +689,7 @@ def main(window):
         Block(block_size * 34, HEIGHT - block_size * 4, block_size),
 
         Waste(block_size * 5, HEIGHT - block_size * 4 - 75,"tire.png"),
-        Waste(block_size * 13, HEIGHT - block_size * 6 - 75,"tire.png"),
+        Waste(block_size * 13, HEIGHT - block_size * 6 - 75,"bottle.png",2),
         Waste(block_size * 22, HEIGHT - block_size * 5 - 75,"trashBag.png"),
         Waste(block_size * 27, HEIGHT - block_size * 3 - 75,"trashBag.png"),
     ]
