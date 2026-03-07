@@ -106,6 +106,7 @@ class Player(pygame.sprite.Sprite):
         # Pour l'affichage des carrés des déchets
         self.trash_icon_size = 8  # taille des carrés
         self.trash_icon_spacing = 7  # espace entre les carrés
+        self.inventory = []
 
     def draw_health_bar(self, win, offset_x):
         bar_x = self.hitbox.x - offset_x
@@ -147,7 +148,7 @@ class Player(pygame.sprite.Sprite):
         for i in range(1, 15):
             t = i * 1.5
             px = start_x + vx * t
-            py = start_y + vy * t + 0.5 * TrashBag.GRAVITY * (t ** 2)
+            py = start_y + vy * t + 0.5 * Waste.GRAVITY * (t ** 2)
 
             pygame.draw.circle(win, (255, 255, 255), (int(px), int(py)), 2)
 
@@ -270,9 +271,10 @@ class Player(pygame.sprite.Sprite):
     def collect_trash(self, obj, objects):
         if self.trash_collected < self.MAX_TRASH:
             self.trash_collected += 1
+            self.inventory.append(obj.filename) # <--- On stocke le nom du fichier image
             if obj in objects:
                 objects.remove(obj)
-            return True  # pour savoir qu’on a collecté
+            return True
         return False
 
 
@@ -305,29 +307,30 @@ class ShadowBlock(Object):
         self.image.blit(img, (0, 0))
 
 
-
-class TrashBag(Object):
+class Waste(Object):
     GRAVITY = 0.8
     FRICTION = 0.98
     BOUNCE_DAMPING = 0.6
     STOP_THRESHOLD = 1
 
-    def __init__(self, x, y, vel_x=0, vel_y=0):
-        width = 18 * 3
-        height = 25 * 3
-        super().__init__(x, y, width, height, "trashbag")
+    def __init__(self, x, y, filename, name="waste", scale=3, vel_x=0, vel_y=0):
+        path = join("assets", "Items", "Waste", filename)
+        img = pygame.image.load(path).convert_alpha()
 
-        # Chargement de l'image
-        img = pygame.image.load(join("assets", "Items", "Waste", "trashBag.png")).convert_alpha()
+        width = img.get_width() * scale
+        height = img.get_height() * scale
+
+        super().__init__(x, y, width, height, name)
         self.image.blit(pygame.transform.scale(img, (width, height)), (0, 0))
 
+        # On stocke le nom du fichier pour pouvoir le réutiliser lors du lancer
+        self.filename = filename
         self.collected = False
-        self.y_vel = vel_y  # Vitesse verticale initiale
-        self.x_vel = vel_x  # Vitesse horizontale initiale
+        self.y_vel = vel_y
+        self.x_vel = vel_x
         self.pos_x = float(x)
         self.pos_y = float(y)
         self.on_ground = False
-        self.is_launched = (vel_x != 0 or vel_y != 0)
 
     def hit_vertical(self, objects):
         self.rect.y += self.y_vel
@@ -500,50 +503,61 @@ def handle_move(player, objects, offset_x):
     collide_left = collide(player, objects, -PLAYER_VEL)
     collide_right = collide(player, objects, PLAYER_VEL)
 
-    if keys[pygame.K_q] and not collide_left:
+    # --- MOUVEMENTS HORIZONTAUX ---
+    if keys[pygame.K_s] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
 
-    collide_down = handle_vertical_collision(player, objects)
-    to_check = set([collide_left, collide_right] + collide_down)
+    # --- COLLISIONS VERTICALES ---
+    handle_vertical_collision(player, objects)
 
+    # --- RAMASSAGE DES DÉCHETS (Touche E) ---
     for obj in objects:
-        if obj.name != "trashbag":
-            continue
-
-        # On peut ramasser si le joueur appuie sur E
-        if keys[pygame.K_e]:
-            # On vérifie si le sac est "ramassable" (au sol ou vitesse faible)
-            # On utilise inflate pour créer une zone de détection plus large autour du sac
+        if isinstance(obj, Waste):  # Détecte tous les types de déchets
+            # On vérifie si le joueur est proche de l'objet
             if player.hitbox.colliderect(obj.rect.inflate(20, 20)):
-                if player.collect_trash(obj, objects):
-                    break  # On en ramasse un seul à la fois
+                if keys[pygame.K_e]:
+                    # On ramasse l'objet et on l'ajoute à l'inventaire du joueur
+                    if player.collect_trash(obj, objects):
+                        break  # On ne ramasse qu'un objet à la fois par appui
+
+    # --- LANCER DES DÉCHETS (Shift + Clic Gauche) ---
     if keys[pygame.K_LSHIFT] and player.trash_collected > 0:
         if mouse_buttons[0]:
+            # Calcul de la position de la souris par rapport au joueur
             m_x, m_y = pygame.mouse.get_pos()
-
             player_screen_x = player.hitbox.centerx - offset_x
 
+            # Calcul de la force du lancer
             v_x = (m_x - player_screen_x) * 0.05
             v_y = (m_y - player.hitbox.centery) * 0.12
 
+            # Limitation de la vitesse max
             MAX_SPEED = 30
             v_x = max(min(v_x, MAX_SPEED), -MAX_SPEED)
             v_y = max(min(v_y, MAX_SPEED), -MAX_SPEED)
 
+            # Position de départ du déchet lancé (gauche ou droite du joueur)
             if m_x > player_screen_x:
                 spawn_x = player.hitbox.right + 10
             else:
                 spawn_x = player.hitbox.left - 60
-
             spawn_y = player.hitbox.top + 10
 
-            launched_bag = TrashBag(spawn_x, spawn_y, v_x, v_y)
-            objects.append(launched_bag)
+            # --- LOGIQUE DYNAMIQUE ---
+            # On récupère le nom du fichier de l'objet ramassé en dernier
+            if len(player.inventory) > 0:
+                last_item_file = player.inventory.pop()
 
-            player.trash_collected -= 1
-            pygame.time.delay(200)
+                # On crée le nouveau projectile avec la BONNE image
+                launched_item = Waste(spawn_x, spawn_y, last_item_file, vel_x=v_x, vel_y=v_y)
+                objects.append(launched_item)
+
+                player.trash_collected -= 1
+
+                # Petit délai pour éviter de lancer tout l'inventaire en un clic
+                pygame.time.delay(200)
 
 class Avion(Object):
     WIDTH = 120
@@ -568,7 +582,7 @@ class Avion(Object):
         if self.drop_timer <= 0:
             trash_x = self.rect.centerx
             trash_y = self.rect.bottom
-            trash = TrashBag(trash_x, trash_y, 0, 0)
+            trash = Waste(trash_x, trash_y, 0, 0)
             objects.append(trash)
             self.reset_drop_timer()
 
@@ -673,10 +687,10 @@ def main(window):
         Block(block_size * 35, HEIGHT - block_size * 4, block_size),
         Block(block_size * 34, HEIGHT - block_size * 4, block_size),
 
-        TrashBag(block_size * 5, HEIGHT - block_size * 4 - 75),
-        TrashBag(block_size * 13, HEIGHT - block_size * 6 - 75),
-        TrashBag(block_size * 22, HEIGHT - block_size * 5 - 75),
-        TrashBag(block_size * 27, HEIGHT - block_size * 3 - 75),
+        Waste(block_size * 5, HEIGHT - block_size * 4 - 75,"tire.png"),
+        Waste(block_size * 13, HEIGHT - block_size * 6 - 75,"tire.png"),
+        Waste(block_size * 22, HEIGHT - block_size * 5 - 75,"trashBag.png"),
+        Waste(block_size * 27, HEIGHT - block_size * 3 - 75,"trashBag.png"),
     ]
 
     offset_x = 0
@@ -705,7 +719,7 @@ def main(window):
         handle_vertical_collision(player, objects)
 
         for obj in objects:
-            if isinstance(obj, TrashBag):
+            if isinstance(obj, Waste):
                 obj.update(objects)
 
             if isinstance(obj, Avion):
