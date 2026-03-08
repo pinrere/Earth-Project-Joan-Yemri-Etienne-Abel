@@ -486,6 +486,9 @@ def handle_vertical_collision(player, objects):
                 player.hitbox.top = obj.rect.bottom
                 player.y_vel = 0
 
+            if isinstance(obj, Water):
+                player.make_hit()
+
             collided.append(obj)
 
     player.rect.topleft = player.hitbox.topleft
@@ -646,6 +649,14 @@ class ParallaxBackground:
             else:
                 self.window.blit(layer["img"], (-self.width - rel_x, 0))
 
+class Water(Object):
+    def __init__(self, y, height, speed):
+        super().__init__(-20000, y, 40000, height, "water")
+        self.speed = speed
+        self.image.fill((120, 80, 40))
+    def update(self):
+        self.rect.y -= self.speed
+
 
 def main(window):
     clock = pygame.time.Clock()
@@ -703,6 +714,9 @@ def main(window):
         Waste(block_size * 27, HEIGHT - block_size * 3 - 75,"trashBag.png"),
     ]
 
+    water = Water(HEIGHT + 200, 200, 0.5)
+    objects.append(water)
+
     offset_x = 0
     scroll_area_width = 200
     scroll = 0
@@ -729,6 +743,9 @@ def main(window):
         handle_vertical_collision(player, objects)
 
         for obj in objects:
+            if isinstance(obj, Water):
+                obj.update()
+
             if isinstance(obj, Waste):
                 obj.update(objects)
 
@@ -736,9 +753,9 @@ def main(window):
                 for other in objects:
                     if isinstance(other, TrashBin):
                         if obj.rect.colliderect(other.hitbox):
-                            if obj.filename == "bottle.png" and other.color == "green":
+                            if obj.filename == "bottle.png" and other.color == "yellow":
                                 objects.remove(obj)
-                            elif obj.filename == "trashBag.png" and other.color == "yellow":
+                            elif obj.filename == "trashBag.png" and other.color == "black":
                                 objects.remove(obj)
                             elif obj.filename == "tire.png" and other.color == "black":
                                 objects.remove(obj)
