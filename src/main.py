@@ -423,7 +423,16 @@ class TrashBin(Object):
         self.color = color
         self.image.blit(pygame.transform.scale(img, (width, height)), (0, 0))
 
+        self.hitbox = pygame.Rect(
+            x + width * 0.25,
+            y + height * 0.35,
+            width * 0.5,
+            height * 0.55
+        )
 
+    def update(self):
+        self.hitbox.x = self.rect.x + self.rect.width * 0.25
+        self.hitbox.y = self.rect.y + self.rect.height * 0.35
 
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
@@ -725,6 +734,18 @@ def main(window):
 
             if isinstance(obj, Avion):
                 obj.update(objects)
+
+            if isinstance(obj, TrashBin):
+                obj.update()
+
+        # Collision déchets / poubelles
+        for obj in objects:
+            if isinstance(obj, Waste):
+                for other in objects:
+                    if isinstance(other, TrashBin):
+                        if obj.rect.colliderect(other.hitbox):
+                            objects.remove(obj)
+                            break
 
         """if random.randint(1, 180) == 1:
             spawn_avion(objects, player.hitbox.x)"""
