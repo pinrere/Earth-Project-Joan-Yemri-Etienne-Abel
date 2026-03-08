@@ -732,20 +732,20 @@ def main(window):
             if isinstance(obj, Waste):
                 obj.update(objects)
 
-            if isinstance(obj, Avion):
-                obj.update(objects)
-
-            if isinstance(obj, TrashBin):
-                obj.update()
-
-        # Collision déchets / poubelles
-        for obj in objects:
-            if isinstance(obj, Waste):
+                # Collision déchets / poubelles
                 for other in objects:
                     if isinstance(other, TrashBin):
                         if obj.rect.colliderect(other.hitbox):
-                            objects.remove(obj)
+                            if obj.filename == "bottle.png" and other.color == "green":
+                                objects.remove(obj)
+                            elif obj.filename == "trashBag.png" and other.color == "yellow":
+                                objects.remove(obj)
+                            elif obj.filename == "tire.png" and other.color == "black":
+                                objects.remove(obj)
                             break
+
+            if isinstance(obj, Avion):
+                obj.update(objects)
 
         """if random.randint(1, 180) == 1:
             spawn_avion(objects, player.hitbox.x)"""
