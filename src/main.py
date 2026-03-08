@@ -517,7 +517,7 @@ def handle_move(player, objects, offset_x):
     collide_right = collide(player, objects, PLAYER_VEL)
 
     # --- MOUVEMENTS HORIZONTAUX ---
-    if keys[pygame.K_s] and not collide_left:
+    if keys[pygame.K_q] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
