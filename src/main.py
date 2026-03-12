@@ -11,7 +11,7 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
-WIDTH, HEIGHT = 1200, 800
+WIDTH, HEIGHT = 1422, 800
 FPS = 60
 PLAYER_VEL = 5
 
