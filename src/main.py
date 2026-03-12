@@ -650,13 +650,54 @@ class ParallaxBackground:
             else:
                 self.window.blit(layer["img"], (-self.width - rel_x, 0))
 
+
 class Water(Object):
-    def __init__(self, y, height, speed = 1):
-        super().__init__(-5000, y, 10000, height, "water")
+    ANIMATION_DELAY = 10  # Environ 6 FPS (60 FPS / 10 = 6 images par seconde)
+    SURFACE_COLOR = (116, 163, 59)  # Couleur hexa #74a33b convertie en RGB
+
+    def __init__(self, y, height, speed=1):
+        # On définit une largeur très grande pour couvrir le niveau
+        # Et la hauteur totale de la masse d'eau
+        super().__init__(-5000, y, 15000, height, "water")
+
+        # Chargement de la feuille de sprite
+        path = join("assets", "Other", "water.png")  # Assure-toi du chemin/nom du fichier
+        sprite_sheet = pygame.image.load(path).convert_alpha()
+
+        # Découpage des 4 frames (200x50 chacune)
+        self.sprites = []
+        for i in range(4):
+            surface = pygame.Surface((200, 50), pygame.SRCALPHA)
+            surface.blit(sprite_sheet, (0, 0), pygame.Rect(0, i * 50, 200, 50))
+            # surface = pygame.transform.scale2x(surface) # Décommente pour agrandir l'écume
+            self.sprites.append(surface)
+
+        self.image = self.sprites[0]
+        self.animation_count = 0
         self.speed = speed
-        self.image.fill((120, 80, 200))
-    def update(self, dy):
-        self.rect.y -= self.speed * dy
+
+    def update(self):
+        # Gestion du cycle d'animation
+        self.animation_count += 1
+        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(self.sprites)
+        self.image = self.sprites[sprite_index]
+
+    def draw(self, win, offset_x):
+        # --- ÉTAPE 1 : Le gros rectangle de couleur unie #74a33b ---
+        # Il remplit toute la zone de l'eau
+        pygame.draw.rect(
+            win,
+            self.SURFACE_COLOR,
+            (self.rect.x - offset_x, self.rect.y + 50, self.rect.width, self.rect.height + 800)
+        )
+
+        # --- ÉTAPE 2 : La ligne d'écume animée tout en haut ---
+        # On dessine l'image en boucle (tiling) UNIQUEMENT sur la première ligne
+        sprite_w = self.image.get_width()
+
+        # On remplit horizontalement, mais y reste fixe à la surface (self.rect.y)
+        for x in range(0, self.rect.width, sprite_w):
+            win.blit(self.image, (self.rect.x + x - offset_x, self.rect.y))
 
 
 def main(window):
@@ -731,6 +772,10 @@ def main(window):
             objects.append(Waste(-50,HEIGHT - block_size * 4 - 75 , "trashBag.png"))
 
         for obj in objects[:]:  # Utilise [:] pour copier la liste car on va supprimer des éléments
+
+            if isinstance(obj, Water):
+                obj.update()
+
             if isinstance(obj, Waste):
                 obj.update(objects)
 
