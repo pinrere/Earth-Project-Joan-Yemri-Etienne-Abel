@@ -108,6 +108,7 @@ class Player(pygame.sprite.Sprite):
         self.trash_icon_size = 8  # taille des carrés
         self.trash_icon_spacing = 7  # espace entre les carrés
         self.inventory = []
+        self.throw_cooldown = 0
 
     def draw_health_bar(self, win, offset_x):
         bar_x = self.hitbox.x - offset_x
@@ -216,6 +217,10 @@ class Player(pygame.sprite.Sprite):
             self.hit_count = 0
 
         self.fall_count += 1
+
+        if self.throw_cooldown > 0:
+            self.throw_cooldown -= 1
+
         self.update_sprite()
 
     def landed(self):
@@ -544,7 +549,7 @@ def handle_move(player, objects, offset_x):
                         break  # On ne ramasse qu'un objet à la fois par appui
 
     # --- LANCER DES DÉCHETS (Shift + Clic Gauche) ---
-    if keys[pygame.K_LSHIFT] and player.trash_collected > 0:
+    if keys[pygame.K_LSHIFT] and player.trash_collected > 0 and player.throw_cooldown == 0:
         if mouse_buttons[0]:
             # Calcul de la position de la souris par rapport au joueur
             m_x, m_y = pygame.mouse.get_pos()
@@ -576,9 +581,7 @@ def handle_move(player, objects, offset_x):
                 objects.append(launched_item)
 
                 player.trash_collected -= 1
-
-                # Petit délai pour éviter de lancer tout l'inventaire en un clic
-                pygame.time.delay(200)
+                player.throw_cooldown = 30
 
 class Avion(Object):
     WIDTH = 120
@@ -751,7 +754,7 @@ def main(window):
 
     bridge = Bridge(bridge_x, bridge_y, bridge_width, img_bottom, img_top)
 
-    player = Player(100, 100, 60, 96)
+    player = Player(150, 100, 60, 96)
     floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
     bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size,"dirtBlock.png") for i in range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
     left_wall = [Block(-960, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
