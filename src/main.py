@@ -71,9 +71,9 @@ def load_sprite_sheets(dir1, dir2, width, height, direction = False):
     return all_sprites
 
 
-def get_block(size):
+def get_block(size, name):
     # On charge directement ton nouveau fichier extrait
-    path = join("assets", "Terrain", "dirtBlock.png")
+    path = join("assets", "Terrain", name)
     image = pygame.image.load(path).convert_alpha()
 
     # On redimensionne l'image à la taille voulue pour le jeu
@@ -400,10 +400,10 @@ class Waste(Object):
             self.x_vel *= 0.9  # Friction au sol pour l'arrêter plus vite
 
 class Block(Object):
-    def __init__(self, x, y, size):
+    def __init__(self, x, y, size, name):
         super().__init__(x, y, size, size)
         # On récupère l'image redimensionnée
-        self.image = get_block(size)
+        self.image = get_block(size, name)
         self.rect = pygame.Rect(x, y, size, size)
 
 class TrashBin(Object):
@@ -449,8 +449,15 @@ def draw(window, bg_parallax, player, objects, offset_x):
     # Cette méthode va blit 'sky', 'houses' et 'road' avec leurs propres calculs de boucle
     bg_parallax.draw(offset_x)
 
+    for obj in objects:
+        if isinstance(obj, Water):
+            obj.draw(window, offset_x)
+
     # 2. Dessin des objets du monde (inchangé)
     for obj in objects:
+        # On évite de dessiner l'eau deux fois
+        if isinstance(obj, Water):
+            continue
         if hasattr(obj, "collected") and obj.collected:
             continue
         obj.draw(window, offset_x)
@@ -626,9 +633,10 @@ class ParallaxBackground:
     def __init__(self, win):
         self.window = win
         self.width = win.get_width()
+        # On définit le décalage vertical : -96 pour monter
+        self.y_offset = -96
 
-        # Chargement des images (assure-toi qu'elles sont dans assets/Background/)
-        # Ordre : Arrière-plan -> Premier plan
+        # Chargement des images
         self.layers = [
             {"img": pygame.image.load(join("assets", "Background", "sky.png")).convert_alpha(), "speed": 0.1},
             {"img": pygame.image.load(join("assets", "Background", "houses.png")).convert_alpha(), "speed": 0.4},
@@ -637,18 +645,17 @@ class ParallaxBackground:
 
     def draw(self, offset_x):
         for layer in self.layers:
-            # On calcule le décalage selon la vitesse du calque
-            # Le modulo (%) permet de faire boucler l'image à l'infini
+            # On calcule le décalage horizontal selon la vitesse du calque
             rel_x = (offset_x * layer["speed"]) % self.width
 
-            # On dessine l'image principale
-            self.window.blit(layer["img"], (-rel_x, 0))
+            # On dessine l'image principale avec le décalage Y de -96
+            self.window.blit(layer["img"], (-rel_x, self.y_offset))
 
-            # On dessine une copie à côté pour combler le vide lors du défilement
+            # On dessine la copie à côté avec le même décalage Y
             if rel_x > 0:
-                self.window.blit(layer["img"], (self.width - rel_x, 0))
+                self.window.blit(layer["img"], (self.width - rel_x, self.y_offset))
             else:
-                self.window.blit(layer["img"], (-self.width - rel_x, 0))
+                self.window.blit(layer["img"], (-self.width - rel_x, self.y_offset))
 
 
 class Water(Object):
@@ -699,6 +706,9 @@ class Water(Object):
         for x in range(0, self.rect.width, sprite_w):
             win.blit(self.image, (self.rect.x + x - offset_x, self.rect.y))
 
+    def up(self, dy):
+        self.rect.y -= dy * self.speed
+
 
 def main(window):
     clock = pygame.time.Clock()
@@ -712,13 +722,24 @@ def main(window):
     segment_length = block_size * 8
 
     player = Player(100, 100, 60, 96)
-    floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH * 10 // block_size, WIDTH * 10 // block_size)]
-    objects = [
-        *floor,
+    floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size,"dirtGrassBlock.png") for i in range(-10, WIDTH * 10 // block_size)]
+    bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size,"dirtBlock.png") for i in range(-10, WIDTH * 10 // block_size)]
+    left_wall = [Block(-960, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
+    left_left__wall = [Block(-1056, j * block_size, block_size,"dirtBlock.png") if j != 0 else Block(-1056, j * block_size, block_size,"dirtGrassBlock.png") for j in range(-5,9)]
+    left_left_left_wall = [Block(-1152, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-1152, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
 
-        TrashBin(-800, HEIGHT - 175, "green"),
-        TrashBin(-640, HEIGHT - 175, "yellow"),
-        TrashBin(-480, HEIGHT - 175, "black"),
+
+    objects = [
+        *bottom_floor,
+        *floor,
+        *left_wall,
+        *left_left__wall,
+        *left_left_left_wall,
+
+
+        TrashBin(-800, HEIGHT - 175 - 96, "green"),
+        TrashBin(-640, HEIGHT - 175 - 96, "yellow"),
+        TrashBin(-480, HEIGHT - 175 - 96, "black"),
 
         ShadowBlock(-180, 0, 80, HEIGHT),
 
@@ -730,7 +751,7 @@ def main(window):
 
     ]
 
-    water = Water(HEIGHT + 200, 200, 0.5)
+    water = Water(HEIGHT - 20, 200, 0.1)
     objects.append(water)
 
     offset_x = 0
@@ -791,7 +812,7 @@ def main(window):
                             else:
                                 # MAUVAISE POUBELLE
                                 # On fait monter l'eau (on réduit sa coordonnée Y)
-                                water.rect.y -= 30
+                                water.up(80)
                                 objects.remove(obj)
                             break
 
