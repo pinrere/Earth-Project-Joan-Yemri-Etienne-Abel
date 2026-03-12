@@ -72,12 +72,13 @@ def load_sprite_sheets(dir1, dir2, width, height, direction = False):
 
 
 def get_block(size):
-    path = join("assets", "Terrain", "Terrain.png")
+    # On charge directement ton nouveau fichier extrait
+    path = join("assets", "Terrain", "dirtBlock.png")
     image = pygame.image.load(path).convert_alpha()
-    surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
-    rect = pygame.Rect(96, 0, size, size)
-    surface.blit(image, (0, 0), rect)
-    return pygame.transform.scale2x(surface)
+
+    # On redimensionne l'image à la taille voulue pour le jeu
+    # (Si block_size est 96, elle restera en 96x96)
+    return pygame.transform.scale(image, (size, size))
 
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
@@ -290,13 +291,6 @@ class Object(pygame.sprite.Sprite):
     def draw(self, win, offset_x):
         win.blit(self.image, (self.rect.x - offset_x, self.rect.y))
 
-class Block(Object):
-    def __init__(self, x, y, size):
-        super().__init__(x, y, size, size)
-        block = get_block(size)
-        self.x = x
-        self.image.blit(block, (0,0))
-
 class ShadowBlock(Object):
     def __init__(self, x, y, width, height):
         super().__init__(x, y, width, height, "shadow")
@@ -404,6 +398,13 @@ class Waste(Object):
         if self.on_ground:
             self.is_launched = False
             self.x_vel *= 0.9  # Friction au sol pour l'arrêter plus vite
+
+class Block(Object):
+    def __init__(self, x, y, size):
+        super().__init__(x, y, size, size)
+        # On récupère l'image redimensionnée
+        self.image = get_block(size)
+        self.rect = pygame.Rect(x, y, size, size)
 
 class TrashBin(Object):
     def __init__(self, x, y, color):
@@ -650,12 +651,12 @@ class ParallaxBackground:
                 self.window.blit(layer["img"], (-self.width - rel_x, 0))
 
 class Water(Object):
-    def __init__(self, y, height, speed):
-        super().__init__(-20000, y, 40000, height, "water")
+    def __init__(self, y, height, speed = 1):
+        super().__init__(-5000, y, 10000, height, "water")
         self.speed = speed
-        self.image.fill((120, 80, 40))
-    def update(self):
-        self.rect.y -= self.speed
+        self.image.fill((120, 80, 200))
+    def update(self, dy):
+        self.rect.y -= self.speed * dy
 
 
 def main(window):
@@ -680,38 +681,12 @@ def main(window):
 
         ShadowBlock(-180, 0, 80, HEIGHT),
 
-        Block(block_size * 1, HEIGHT - block_size * 2, block_size),
+        Waste(block_size * 5, HEIGHT - block_size * 4 - 75,"tire.png",3.4),
+        Waste(block_size * 7, HEIGHT - block_size * 6 - 75,"bottle.png",2),
+        Waste(block_size * 8, HEIGHT - block_size * 3 - 75, "glassBottle.png", 1),
+        Waste(block_size * 9, HEIGHT - block_size * 5 - 75,"trashBag.png"),
+        Waste(block_size * 11, HEIGHT - block_size * 3 - 75,"cardboard.png",2.7),
 
-        Block(block_size * 3, HEIGHT - block_size * 7, block_size),
-        Block(block_size * 5, HEIGHT - block_size * 3, block_size),
-        Block(block_size * 7, HEIGHT - block_size * 6, block_size),
-
-        Block(block_size * 9, HEIGHT - block_size * 4, block_size),
-        Block(block_size * 11, HEIGHT - block_size * 7, block_size),
-        Block(block_size * 13, HEIGHT - block_size * 5, block_size),
-
-        Block(block_size * 15, HEIGHT - block_size * 6, block_size),
-        Block(block_size * 17, HEIGHT - block_size * 2, block_size),
-
-        Block(block_size * 19, HEIGHT - block_size * 7, block_size),
-        Block(block_size * 21, HEIGHT - block_size * 4, block_size),
-
-        Block(block_size * 23, HEIGHT - block_size * 6, block_size),
-        Block(block_size * 25, HEIGHT - block_size * 3, block_size),
-
-        Block(block_size * 27, HEIGHT - block_size * 7, block_size),
-        Block(block_size * 29, HEIGHT - block_size * 5, block_size),
-
-        Block(block_size * 31, HEIGHT - block_size * 6, block_size),
-        Block(block_size * 33, HEIGHT - block_size * 4, block_size),
-        Block(-block_size * 36, HEIGHT - block_size * 2, block_size),
-        Block(block_size * 35, HEIGHT - block_size * 4, block_size),
-        Block(block_size * 34, HEIGHT - block_size * 4, block_size),
-
-        Waste(block_size * 5, HEIGHT - block_size * 4 - 75,"tire.png"),
-        Waste(block_size * 13, HEIGHT - block_size * 6 - 75,"bottle.png",2),
-        Waste(block_size * 22, HEIGHT - block_size * 5 - 75,"trashBag.png"),
-        Waste(block_size * 27, HEIGHT - block_size * 3 - 75,"trashBag.png"),
     ]
 
     water = Water(HEIGHT + 200, 200, 0.5)
@@ -742,27 +717,38 @@ def main(window):
         player.loop(FPS)
         handle_vertical_collision(player, objects)
 
-        for obj in objects:
-            if isinstance(obj, Water):
-                obj.update()
+        # Dictionnaire de correspondance : Fichier -> Couleur de poubelle
+        WASTE_TYPES = {
+            "glassBottle.png": "green",
+            "cardboard.png": "yellow",
+            "bottle.png": "yellow",
+            "tire.png": "black",
+            "trashBag.png": "black"
+        }
 
+        if not any(isinstance(obj, Waste) and obj.filename == "trashBag.png" for obj in objects) and not any(
+                item[0] == "trashBag.png" for item in player.inventory):
+            objects.append(Waste(-50,HEIGHT - block_size * 4 - 75 , "trashBag.png"))
+
+        for obj in objects[:]:  # Utilise [:] pour copier la liste car on va supprimer des éléments
             if isinstance(obj, Waste):
                 obj.update(objects)
 
-                # Collision déchets / poubelles
                 for other in objects:
                     if isinstance(other, TrashBin):
+                        # On vérifie la collision avec la hitbox de la poubelle
                         if obj.rect.colliderect(other.hitbox):
-                            if obj.filename == "bottle.png" and other.color == "yellow":
+                            correct_color = WASTE_TYPES.get(obj.filename)
+
+                            if correct_color == other.color:
+                                # BONNE POUBELLE
                                 objects.remove(obj)
-                            elif obj.filename == "trashBag.png" and other.color == "black":
-                                objects.remove(obj)
-                            elif obj.filename == "tire.png" and other.color == "black":
+                            else:
+                                # MAUVAISE POUBELLE
+                                # On fait monter l'eau (on réduit sa coordonnée Y)
+                                water.rect.y -= 30
                                 objects.remove(obj)
                             break
-
-            if isinstance(obj, Avion):
-                obj.update(objects)
 
         """if random.randint(1, 180) == 1:
             spawn_avion(objects, player.hitbox.x)"""
@@ -792,16 +778,7 @@ def main(window):
         # --- AJOUT ETAPE 5 : DESSIN ---
         draw(window, parallax_bg, player, objects, offset_x)
 
-        # --- GÉNÉRATION DES BLOCS ---
-        if player.hitbox.x + WIDTH > generated_until:
-            start_x = generated_until
-            end_x = generated_until + segment_length
-            for i in range(random.randint(3, 7)):
-                x = random.randint(start_x, end_x) // block_size * block_size
-                height_level = random.choice([2, 3, 4, 5, 6])
-                y = HEIGHT - block_size * height_level
-                objects.append(Block(x, y, block_size))
-            generated_until += segment_length
+
 
 
     pygame.quit()
