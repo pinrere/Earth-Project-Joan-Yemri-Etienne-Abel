@@ -629,6 +629,22 @@ def spawn_avion(objects, x):
     objects.append(avion)
 
 
+class Bridge(Object):
+    def __init__(self, x, y, width, bottom_img, top_img):
+        # On définit la hauteur totale basée sur le bottom_img pour la collision
+        super().__init__(x, y, width, bottom_img.get_height(), "bridge")
+        self.bottom_img = bottom_img
+        self.top_img = top_img
+        # Le rect de collision sera calé sur le haut du bottomBridge
+        self.rect = pygame.Rect(x, y, width, 20) # 20px d'épaisseur pour marcher dessus
+
+    def draw(self, win, offset_x):
+        # On dessine le bas (le support)
+        win.blit(self.bottom_img, (self.rect.x - offset_x, self.rect.y))
+        # On dessine le haut (la rambarde) juste au dessus
+        # On soustrait la hauteur de la rambarde pour qu'elle soit posée sur le pont
+        win.blit(self.top_img, (self.rect.x - offset_x, self.rect.y - self.top_img.get_height() + 3))
+
 class ParallaxBackground:
     def __init__(self, win):
         self.window = win
@@ -721,21 +737,35 @@ def main(window):
     generated_until = block_size * 36  #utilisation gen aleatoire
     segment_length = block_size * 8
 
+    img_top = pygame.image.load(join("assets", "Terrain", "topBridge.png")).convert_alpha()
+    img_bottom = pygame.image.load(join("assets", "Terrain", "bottomBridge.png")).convert_alpha()
+
+    # On scale pour que ça fasse exactement la largeur de 3 blocs (3 * 96 = 288)
+    # sans changer la hauteur pour respecter ton souhait
+    bridge_width = 308
+
+
+    # Positionnement au niveau du trou (index 3)
+    bridge_x = 3 * block_size - 10
+    bridge_y = HEIGHT - block_size * 2 # Aligné sur le haut du sol
+
+    bridge = Bridge(bridge_x, bridge_y, bridge_width, img_bottom, img_top)
+
     player = Player(100, 100, 60, 96)
-    floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size,"dirtGrassBlock.png") for i in range(-10, WIDTH * 10 // block_size)]
-    bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size,"dirtBlock.png") for i in range(-10, WIDTH * 10 // block_size)]
+    floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
+    bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size,"dirtBlock.png") for i in range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
     left_wall = [Block(-960, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
     left_left__wall = [Block(-1056, j * block_size, block_size,"dirtBlock.png") if j != 0 else Block(-1056, j * block_size, block_size,"dirtGrassBlock.png") for j in range(-5,9)]
     left_left_left_wall = [Block(-1152, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-1152, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
 
 
     objects = [
+        bridge,
         *bottom_floor,
         *floor,
         *left_wall,
         *left_left__wall,
         *left_left_left_wall,
-
 
         TrashBin(-800, HEIGHT - 175 - 96, "green"),
         TrashBin(-640, HEIGHT - 175 - 96, "yellow"),
@@ -743,15 +773,15 @@ def main(window):
 
         ShadowBlock(-180, 0, 80, HEIGHT),
 
-        Waste(block_size * 5, HEIGHT - block_size * 4 - 75,"tire.png",3.4),
-        Waste(block_size * 7, HEIGHT - block_size * 6 - 75,"bottle.png",2),
-        Waste(block_size * 8, HEIGHT - block_size * 3 - 75, "glassBottle.png", 1),
-        Waste(block_size * 9, HEIGHT - block_size * 5 - 75,"trashBag.png"),
-        Waste(block_size * 11, HEIGHT - block_size * 3 - 75,"cardboard.png",2.7),
+        Waste(block_size * 10, HEIGHT - block_size * 4 - 75,"tire.png",3.4),
+        Waste(block_size * 11.5, HEIGHT - block_size * 4 - 75,"bottle.png",2),
+        Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "glassBottle.png", 1),
+        Waste(block_size * 13, HEIGHT - block_size * 4 - 75,"trashBag.png"),
+        Waste(block_size * 14, HEIGHT - block_size * 4 - 75,"cardboard.png",2.7),
 
     ]
 
-    water = Water(HEIGHT - 20, 200, 0.1)
+    water = Water(HEIGHT - 100, 200, 0.3)
     objects.append(water)
 
     offset_x = 0
@@ -787,10 +817,6 @@ def main(window):
             "tire.png": "black",
             "trashBag.png": "black"
         }
-
-        if not any(isinstance(obj, Waste) and obj.filename == "trashBag.png" for obj in objects) and not any(
-                item[0] == "trashBag.png" for item in player.inventory):
-            objects.append(Waste(-50,HEIGHT - block_size * 4 - 75 , "trashBag.png"))
 
         for obj in objects[:]:  # Utilise [:] pour copier la liste car on va supprimer des éléments
 
