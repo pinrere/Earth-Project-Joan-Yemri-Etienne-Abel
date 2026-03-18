@@ -621,7 +621,6 @@ class Avion(Object):
             (self.rect.x - offset_x, self.rect.y, self.rect.width, self.rect.height)
         )
 
-
 def spawn_avion(objects, x):
     direction = random.choice([-1, 1])
     if direction == 1:
