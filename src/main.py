@@ -11,7 +11,7 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
-WIDTH, HEIGHT = 1422, 800
+WIDTH, HEIGHT = 1200, 750
 FPS = 60
 PLAYER_VEL = 5
 
@@ -606,7 +606,21 @@ class Avion(Object):
         if self.drop_timer <= 0:
             trash_x = self.rect.centerx
             trash_y = self.rect.bottom
-            trash = Waste(trash_x, trash_y, 0, 0)
+            random_file = random.choice([
+                "tire.png",
+                "bottle.png",
+                "glassBottle.png",
+                "trashBag.png",
+                "cardboard.png"
+            ])
+            trash = Waste(
+                trash_x,
+                trash_y,
+                random_file,
+                scale = 2,
+                vel_x = random.uniform(-2, 2),
+                vel_y = random.uniform(2, 5)
+            )
             objects.append(trash)
             self.reset_drop_timer()
 
@@ -823,6 +837,9 @@ def main(window):
 
         for obj in objects[:]:  # Utilise [:] pour copier la liste car on va supprimer des éléments
 
+            if isinstance(obj, Avion):
+                obj.update(objects)
+
             if isinstance(obj, Water):
                 obj.update()
 
@@ -845,8 +862,8 @@ def main(window):
                                 objects.remove(obj)
                             break
 
-        """if random.randint(1, 180) == 1:
-            spawn_avion(objects, player.hitbox.x)"""
+        if random.randint(1, 180) == 1:
+            spawn_avion(objects, player.hitbox.x)
 
         if player.hitbox.x <= -95 and not camera_shifted:
             saved_offset_x = offset_x
