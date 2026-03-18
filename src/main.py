@@ -11,7 +11,7 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
-WIDTH, HEIGHT = 1200, 750
+WIDTH, HEIGHT = 1422, 800
 FPS = 60
 PLAYER_VEL = 5
 
@@ -583,57 +583,92 @@ def handle_move(player, objects, offset_x):
                 player.trash_collected -= 1
                 player.throw_cooldown = 30
 
+
 class Avion(Object):
-    WIDTH = 120
-    HEIGHT = 40
-    COLOR = (255, 0, 0)
+    # 0.5 secondes à 60 FPS = 30 frames
+    OPEN_DURATION = 30
 
     def __init__(self, x, y, direction=1, speed=3):
-        super().__init__(x, y, self.WIDTH, self.HEIGHT, "avion")
+        # --- CHARGEMENT DES IMAGES ---
+        # On construit le chemin : assets/Items/Plane/planeClosed.png
+        path_closed = join("assets", "Items", "Plane", "planeClosed.png")
+        path_open = join("assets", "Items", "Plane", "planeOpen.png")
+
+        self.img_closed = pygame.image.load(path_closed).convert_alpha()
+        self.img_open = pygame.image.load(path_open).convert_alpha()
+
+        # On redimensionne (x3 pour que ce soit bien visible)
+        scale = 3
+        self.img_closed = pygame.transform.scale_by(self.img_closed, scale)
+        self.img_open = pygame.transform.scale_by(self.img_open, scale)
+
+        width = self.img_closed.get_width()
+        height = self.img_closed.get_height()
+
+        super().__init__(x, y, width, height, "avion")
+
         self.direction = direction  # 1 = droite, -1 = gauche
         self.speed = speed
+
+        # Timers pour le largage
         self.reset_drop_timer()
-        self.image.fill(self.COLOR)
+        self.is_open = False
+        self.post_drop_timer = 0
 
     def reset_drop_timer(self):
-        self.drop_timer = random.randint(60, 240)
+        # L'avion lâche un truc toutes les 2 à 5 secondes
+        self.drop_timer = random.randint(120, 300)
 
     def move(self):
         self.rect.x += self.speed * self.direction
 
-    def try_drop_trash(self, objects):
-        self.drop_timer -= 1
-        if self.drop_timer <= 0:
-            trash_x = self.rect.centerx
-            trash_y = self.rect.bottom
-            random_file = random.choice([
-                "tire.png",
-                "bottle.png",
-                "glassBottle.png",
-                "trashBag.png",
-                "cardboard.png"
-            ])
-            trash = Waste(
-                trash_x,
-                trash_y,
-                random_file,
-                scale = 2,
-                vel_x = random.uniform(-2, 2),
-                vel_y = random.uniform(2, 5)
-            )
-            objects.append(trash)
-            self.reset_drop_timer()
-
     def update(self, objects):
         self.move()
-        self.try_drop_trash(objects)
+        self.drop_timer -= 1
+
+        # 1. On ouvre 0.5s (30 frames) AVANT le largage
+        if self.drop_timer <= self.OPEN_DURATION:
+            self.is_open = True
+
+        # 2. Le moment du largage
+        if self.drop_timer <= 0:
+            self.drop_waste(objects)
+            self.reset_drop_timer()
+            self.post_drop_timer = self.OPEN_DURATION  # On garde ouvert 0.5s APRES
+
+        # 3. Gestion de la fermeture après le délai
+        if self.post_drop_timer > 0:
+            self.post_drop_timer -= 1
+        elif self.drop_timer > self.OPEN_DURATION:
+            # On ne referme que si on n'est pas déjà dans la phase "avant largage"
+            self.is_open = False
+
+    def drop_waste(self, objects):
+        # On fait apparaître le déchet au niveau de la soute (arrière de l'avion)
+        # Si direction = -1 (gauche), l'arrière est à droite de l'image
+        trash_x = self.rect.right - 20 if self.direction == -1 else self.rect.left + 20
+        trash_y = self.rect.bottom - 15
+
+        random_file = random.choice(["tire.png", "bottle.png", "glassBottle.png", "trashBag.png", "cardboard.png"])
+
+        # Petit ajustement de scale selon l'objet pour que ce soit réaliste
+        scales = {"tire.png": 3.4, "glassBottle.png": 1, "cardboard.png": 2.7}
+        s = scales.get(random_file, 2)
+
+        trash = Waste(trash_x, trash_y, random_file, scale=s, vel_x=self.speed * self.direction, vel_y=2)
+        objects.append(trash)
 
     def draw(self, win, offset_x):
-        pygame.draw.rect(
-            win,
-            self.COLOR,
-            (self.rect.x - offset_x, self.rect.y, self.rect.width, self.rect.height)
-        )
+        # Choix de l'image selon l'état soute ouverte/fermée
+        sprite = self.img_open if self.is_open else self.img_closed
+
+        # Ton dessin original pointe vers la gauche.
+        # Si direction = 1 (droite), on flippe l'image horizontalement.
+        if self.direction == 1:
+            sprite = pygame.transform.flip(sprite, True, False)
+
+        win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
+
 
 def spawn_avion(objects, x):
     direction = random.choice([-1, 1])
