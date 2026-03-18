@@ -809,9 +809,12 @@ def main(window):
     saved_offset_x = 0
     saved_scroll = 0
 
+    cpt = 0
+
     run = True
     while run:
         clock.tick(FPS)
+        cpt += 1
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -862,7 +865,7 @@ def main(window):
                                 objects.remove(obj)
                             break
 
-        if random.randint(1, 180) == 1:
+        if random.randint(1, 180) == 1 and cpt % 5 == 0:
             spawn_avion(objects, player.hitbox.x)
 
         if player.hitbox.x <= -95 and not camera_shifted:
