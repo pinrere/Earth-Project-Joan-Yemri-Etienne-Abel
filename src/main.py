@@ -109,6 +109,9 @@ class Player(pygame.sprite.Sprite):
         self.trash_icon_spacing = 7  # espace entre les carrés
         self.inventory = []
         self.throw_cooldown = 0
+        self.slot_image = pygame.Surface((60, 60), pygame.SRCALPHA)
+        pygame.draw.rect(self.slot_image, (100, 100, 100, 150), (0, 0, 60, 60),border_radius=5)  # Fond gris semi-transparent
+        pygame.draw.rect(self.slot_image, (255, 255, 255), (0, 0, 60, 60), 2, border_radius=5)  # Bordure blanche
 
     def draw_health_bar(self, win, offset_x):
         bar_x = self.hitbox.x - offset_x
@@ -154,16 +157,48 @@ class Player(pygame.sprite.Sprite):
 
             pygame.draw.circle(win, (255, 255, 255), (int(px), int(py)), 2)
 
-    def draw_trash_bar(self, win, offset_x):
-        bar_x = self.hitbox.x - offset_x
-        bar_y = self.hitbox.y - 30  # au-dessus de la barre de vie
+    def draw_inventory(self, win):
+        padding = 20
+        slot_size = 60
+        gap = 10
+        target_max = 40  # La taille maximale souhaitée (longueur ou largeur)
 
+        start_x = WIDTH - padding - slot_size
+        start_y = padding
+
+        # 1. Dessiner les slots vides
         for i in range(self.MAX_TRASH):
-            x = bar_x + i * (self.trash_icon_size + self.trash_icon_spacing) + 10
-            y = bar_y
-            color = (255, 30, 45) if i < self.trash_collected else (50, 50, 50)  # vert si collecté, gris sinon
-            pygame.draw.rect(win, color, (x, y, self.trash_icon_size, self.trash_icon_size))
-            pygame.draw.rect(win, (0, 0, 0), (x, y, self.trash_icon_size, self.trash_icon_size), 2)  # bordure noire
+            x = start_x - (i * (slot_size + gap))
+            win.blit(self.slot_image, (x, start_y))
+
+        # 2. Dessiner les objets
+        for i, item_data in enumerate(reversed(self.inventory)):
+            if i < self.MAX_TRASH:
+                filename, _ = item_data
+                path = join("assets", "Items", "Waste", filename)
+                item_img = pygame.image.load(path).convert_alpha()
+
+                # --- REDIMENSIONNEMENT PROPORTIONNEL ---
+                original_width = item_img.get_width()
+                original_height = item_img.get_height()
+
+                # On cherche le ratio pour que le plus grand côté soit égal à target_max
+                ratio = target_max / max(original_width, original_height)
+
+                new_width = int(original_width * ratio)
+                new_height = int(original_height * ratio)
+
+                item_img = pygame.transform.scale(item_img, (new_width, new_height))
+
+                # --- CENTRAGE DYNAMIQUE ---
+                # On calcule la position pour que l'image soit bien au milieu du slot de 60px
+                x_slot = start_x - (i * (slot_size + gap))
+
+                # Offset = (Taille du slot - Taille de l'image) / 2
+                pos_x = x_slot + (slot_size - new_width) // 2
+                pos_y = start_y + (slot_size - new_height) // 2
+
+                win.blit(item_img, (pos_x, pos_y))
 
     def jump(self):
         if self.jump_count == 0:
@@ -477,8 +512,8 @@ def draw(window, bg_parallax, player, objects, offset_x):
     )
     player.draw(window, offset_x)
     player.draw_health_bar(window, offset_x)
-    player.draw_trash_bar(window, offset_x)
     player.draw_trajectory(window, offset_x)
+    player.draw_inventory(window)
 
     pygame.display.update()
 
@@ -652,7 +687,7 @@ class Avion(Object):
         random_file = random.choice(["tire.png", "bottle.png", "glassBottle.png", "trashBag.png", "cardboard.png"])
 
         # Petit ajustement de scale selon l'objet pour que ce soit réaliste
-        scales = {"tire.png": 3.4, "glassBottle.png": 1, "cardboard.png": 2.7}
+        scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7}
         s = scales.get(random_file, 2)
 
         trash = Waste(trash_x, trash_y, random_file, scale=s, vel_x=self.speed * self.direction, vel_y=2)
@@ -825,7 +860,7 @@ def main(window):
 
         ShadowBlock(-180, 0, 80, HEIGHT),
 
-        Waste(block_size * 10, HEIGHT - block_size * 4 - 75,"tire.png",3.4),
+        Waste(block_size * 10, HEIGHT - block_size * 4 - 75,"tire.png",3),
         Waste(block_size * 11.5, HEIGHT - block_size * 4 - 75,"bottle.png",2),
         Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "glassBottle.png", 1),
         Waste(block_size * 13, HEIGHT - block_size * 4 - 75,"trashBag.png"),
