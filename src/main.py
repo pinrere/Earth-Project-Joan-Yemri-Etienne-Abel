@@ -493,6 +493,7 @@ def draw(window, bg_parallax, player, objects, offset_x):
         if isinstance(obj, Water):
             obj.draw(window, offset_x)
 
+
     # 2. Dessin des objets du monde (inchangé)
     for obj in objects:
         if isinstance(obj, Water):
