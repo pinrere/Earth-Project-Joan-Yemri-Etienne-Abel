@@ -874,7 +874,7 @@ def main(window):
         TrashBin(-480, HEIGHT - 175 - 96, "black"),
 
         ShadowBlock(-180, 0, 80, HEIGHT),
-        Plot(-148, 536, 48, 72),
+        Plot(-150, 536, 48, 72),
 
         Waste(block_size * 10, HEIGHT - block_size * 4 - 75,"tire.png",3),
         Waste(block_size * 11.5, HEIGHT - block_size * 4 - 75,"bottle.png",2),
