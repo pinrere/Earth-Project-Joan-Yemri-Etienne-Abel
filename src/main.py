@@ -929,21 +929,30 @@ def main(window):
             if isinstance(obj, Water):
                 obj.update()
 
+            if isinstance(obj, Avion):
+                obj.update(objects)
+                if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0:
+                    player.health -= 17
+                    if obj in objects:
+                        objects.remove(obj)
+
             if isinstance(obj, Waste):
                 obj.update(objects)
 
+                if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
+                    player.health -= 17
+                    player.health = max(0, player.health)
+                    if obj in objects:
+                        objects.remove(obj)
+                    continue
+
                 for other in objects:
                     if isinstance(other, TrashBin):
-                        # On vérifie la collision avec la hitbox de la poubelle
                         if obj.rect.colliderect(other.hitbox):
                             correct_color = WASTE_TYPES.get(obj.filename)
-
                             if correct_color == other.color:
-                                # BONNE POUBELLE
                                 objects.remove(obj)
                             else:
-                                # MAUVAISE POUBELLE
-                                # On fait monter l'eau (on réduit sa coordonnée Y)
                                 water.up(80)
                                 objects.remove(obj)
                             break
