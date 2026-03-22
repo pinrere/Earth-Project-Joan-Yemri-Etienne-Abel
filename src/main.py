@@ -71,14 +71,14 @@ def load_sprite_sheets(dir1, dir2, width, height, direction = False):
     return all_sprites
 
 
-def get_block(size, name):
+def get_block(size_x, size_y, name):
     # On charge directement ton nouveau fichier extrait
     path = join("assets", "Terrain", name)
     image = pygame.image.load(path).convert_alpha()
 
     # On redimensionne l'image à la taille voulue pour le jeu
     # (Si block_size est 96, elle restera en 96x96)
-    return pygame.transform.scale(image, (size, size))
+    return pygame.transform.scale(image, (size_x, size_y))
 
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
@@ -440,11 +440,11 @@ class Waste(Object):
             self.x_vel *= 0.9  # Friction au sol pour l'arrêter plus vite
 
 class Block(Object):
-    def __init__(self, x, y, size, name):
-        super().__init__(x, y, size, size)
+    def __init__(self, x, y, size_y, name, size_x=96):
+        super().__init__(x, y, size_x, size_y)
         # On récupère l'image redimensionnée
-        self.image = get_block(size, name)
-        self.rect = pygame.Rect(x, y, size, size)
+        self.image = get_block(size_x, size_y, name)
+        self.rect = pygame.Rect(x, y, size_x, size_y)
 
 class TrashBin(Object):
     def __init__(self, x, y, color):
@@ -495,8 +495,9 @@ def draw(window, bg_parallax, player, objects, offset_x):
 
     # 2. Dessin des objets du monde (inchangé)
     for obj in objects:
-        # On évite de dessiner l'eau deux fois
         if isinstance(obj, Water):
+            continue
+        if isinstance(obj, ShadowBlock):
             continue
         if hasattr(obj, "collected") and obj.collected:
             continue
