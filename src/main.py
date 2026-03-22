@@ -88,7 +88,7 @@ class Player(pygame.sprite.Sprite):
 
     def __init__(self, x, y, width, height):
         super().__init__()
-        self.hitbox = pygame.Rect(x, y, width, height)
+        self.hitbox = pygame.Rect(x, y, width, height-2)
         self.rect = self.hitbox.copy()
         self.x_vel = 0
         self.y_vel = 0
@@ -341,6 +341,20 @@ class ShadowBlock(Object):
         self.image.blit(img, (0, 0))
 
 
+class Plot(Object):
+    def __init__(self, x, y, width, height):
+        super().__init__(x, y, width, height, "plot")
+        # On charge l'image du plot
+        path = join("assets", "Other", "Plot.png")
+        img = pygame.image.load(path).convert_alpha()
+
+        # On redimensionne l'image pour qu'elle corresponde à la taille voulue
+        self.image = pygame.transform.scale(img, (width, height))
+
+    def draw(self, win, offset_x):
+        win.blit(self.image, (self.rect.x - offset_x, self.rect.y))
+
+
 class Waste(Object):
     GRAVITY = 0.8
     FRICTION = 0.98
@@ -505,13 +519,6 @@ def draw(window, bg_parallax, player, objects, offset_x):
         obj.draw(window, offset_x)
 
     # 3. Dessin du joueur et de ses barres d'état (inchangé)
-    # Note : J'ai gardé ta hitbox rouge (rect) pour tes tests
-    pygame.draw.rect(
-        window,
-        (255, 0, 0),
-        player.hitbox.move(-offset_x, 0),
-        2
-    )
     player.draw(window, offset_x)
     player.draw_health_bar(window, offset_x)
     player.draw_trajectory(window, offset_x)
@@ -861,6 +868,7 @@ def main(window):
         TrashBin(-480, HEIGHT - 175 - 96, "black"),
 
         ShadowBlock(-180, 0, 80, HEIGHT),
+        Plot(-148, 536, 48, 72),
 
         Waste(block_size * 10, HEIGHT - block_size * 4 - 75,"tire.png",3),
         Waste(block_size * 11.5, HEIGHT - block_size * 4 - 75,"bottle.png",2),
