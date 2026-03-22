@@ -926,13 +926,6 @@ def main(window):
 
         for obj in objects[:]:  # Utilise [:] pour copier la liste car on va supprimer des éléments
 
-            if isinstance(obj, Avion):
-                obj.update(objects)
-                if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0:
-                    player.health -= 17
-                    if obj in objects:
-                        objects.remove(obj)
-
             if isinstance(obj, Water):
                 obj.update()
 
