@@ -113,25 +113,31 @@ class Player(pygame.sprite.Sprite):
         pygame.draw.rect(self.slot_image, (100, 100, 100, 150), (0, 0, 60, 60),border_radius=5)  # Fond gris semi-transparent
         pygame.draw.rect(self.slot_image, (255, 255, 255), (0, 0, 60, 60), 2, border_radius=5)  # Bordure blanche
 
+    HEART_IMG = pygame.image.load(join("assets", "Other", "heart.png")).convert_alpha()
+
     def draw_health_bar(self, win, offset_x):
-        bar_x = self.hitbox.x - offset_x
-        bar_y = self.hitbox.y - 20
-        bar_width = self.hitbox.width
-        bar_height = 10
+        heart_scale = 1.5
+        heart = pygame.transform.scale(
+            self.HEART_IMG,
+            (self.HEART_IMG.get_width() * heart_scale,
+             self.HEART_IMG.get_height() * heart_scale)
+        )
 
-        pygame.draw.rect(win, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
+        max_hearts = 3
+        current_hearts = round((self.health / self.max_health) * max_hearts)
 
-        color = (0, 255, 0)
-        if self.health < 50: color = (255, 165, 0)
-        if self.health < 20: color = (255, 0, 0)
-        health_ratio = self.health / self.max_health
+        bar_x = 20
+        bar_y = 20
+        spacing = heart.get_width() + 4
 
-        current_health_width = bar_width * health_ratio
-
-        if self.health > 0:
-            pygame.draw.rect(win, color, (bar_x, bar_y, current_health_width, bar_height))
-
-        pygame.draw.rect(win, (0, 0, 0), (bar_x, bar_y, bar_width, bar_height), 2)
+        for i in range(max_hearts):
+            if i < current_hearts:
+                win.blit(heart, (bar_x + i * spacing, bar_y))
+            else:
+                # Cœur grisé (vide)
+                grey = heart.copy()
+                grey.fill((80, 80, 80, 180), special_flags=pygame.BLEND_RGBA_MULT)
+                win.blit(grey, (bar_x + i * spacing, bar_y))
 
     def draw_trajectory(self, win, offset_x):
         keys = pygame.key.get_pressed()
@@ -922,6 +928,10 @@ def main(window):
 
             if isinstance(obj, Avion):
                 obj.update(objects)
+                if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0:
+                    player.health -= 17
+                    if obj in objects:
+                        objects.remove(obj)
 
             if isinstance(obj, Water):
                 obj.update()
