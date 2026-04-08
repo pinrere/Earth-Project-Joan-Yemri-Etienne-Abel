@@ -131,8 +131,8 @@ class Player(pygame.sprite.Sprite):
         self.hit_count = 0
         self.sprite_offset_x = 67
         self.sprite_offset_y = 50
-        self.max_health = 100
-        self.health = 100
+        self.max_health = 6
+        self.health = 6
         self.trash_collected = 0
         self.MAX_TRASH = 3
         # Pour l'affichage des carrés des déchets
@@ -150,25 +150,33 @@ class Player(pygame.sprite.Sprite):
         heart_scale = 1.5
         heart = pygame.transform.scale(
             self.HEART_IMG,
-            (self.HEART_IMG.get_width() * heart_scale,
-             self.HEART_IMG.get_height() * heart_scale)
+            (int(self.HEART_IMG.get_width() * heart_scale),
+             int(self.HEART_IMG.get_height() * heart_scale))
         )
 
-        max_hearts = 3
-        current_hearts = round((self.health / self.max_health) * max_hearts)
+        # On crée dynamiquement l'image du demi-cœur (moitié gauche)
+        half_heart = heart.subsurface((0, 0, heart.get_width() // 2, heart.get_height()))
+
+        # On crée le cœur grisé pour le fond
+        grey = heart.copy()
+        grey.fill((80, 80, 80, 180), special_flags=pygame.BLEND_RGBA_MULT)
 
         bar_x = 20
         bar_y = 20
         spacing = heart.get_width() + 4
 
-        for i in range(max_hearts):
-            if i < current_hearts:
-                win.blit(heart, (bar_x + i * spacing, bar_y))
-            else:
-                # Cœur grisé (vide)
-                grey = heart.copy()
-                grey.fill((80, 80, 80, 180), special_flags=pygame.BLEND_RGBA_MULT)
-                win.blit(grey, (bar_x + i * spacing, bar_y))
+        for i in range(3):
+            x_pos = bar_x + i * spacing
+
+            # 1. On dessine toujours le fond gris
+            win.blit(grey, (x_pos, bar_y))
+
+            # 2. Cœur plein si la vie est suffisante (ex: 2 PV pour le 1er cœur)
+            if self.health >= (i + 1) * 2:
+                win.blit(heart, (x_pos, bar_y))
+            # 3. Demi-cœur si le chiffre est impair
+            elif self.health == (i * 2) + 1:
+                win.blit(half_heart, (x_pos, bar_y))
 
     def draw_trajectory(self, win, offset_x):
         keys = pygame.key.get_pressed()
@@ -667,45 +675,39 @@ class Avion(Object):
     # Vitesse de l'animation (plus c'est bas, plus les frames défilent vite)
     ANIMATION_DELAY = 15
 
-    def __init__(self, x, y, direction=1, speed=3):
-        # --- CHARGEMENT DU SPRITESHEET ---
+    def __init__(self, x, y, direction=1, speed=3, level=0):
+        # (Garde tout le chargement du sprite ici...)
         path = join("assets", "Items", "Plane", "planeSprite.png")
         sprite_sheet = pygame.image.load(path).convert_alpha()
-
         self.sprites = []
         frame_width = 350
         frame_height = 150
-
-        # J'ai mis le scale à 1 car 350x150 c'est déjà assez grand.
-        # Si c'est trop petit, passe-le à 1.5 ou 2 !
         scale = 1
-
-        # Découpage des 7 images
         for i in range(7):
             surface = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA, 32)
             rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
             surface.blit(sprite_sheet, (0, 0), rect)
-
             if scale != 1:
                 surface = pygame.transform.scale_by(surface, scale)
-
             self.sprites.append(surface)
-
         width = self.sprites[0].get_width()
         height = self.sprites[0].get_height()
-
         super().__init__(x, y, width, height, "avion")
 
-        self.direction = direction  # 1 = droite, -1 = gauche
+        self.direction = direction
         self.speed = speed
-
-        # --- VARIABLES D'ANIMATION ET LARGAGE ---
         self.animation_count = 0
+        self.level = level  # On sauvegarde le niveau
         self.reset_drop_timer()
 
     def reset_drop_timer(self):
-        # L'avion lâche un truc toutes les 2 à 5 secondes (à 60 FPS)
-        self.drop_timer = random.randint(120, 300)
+        # Plus le niveau est haut, plus le drop est rapide
+        if self.level == 0:
+            self.drop_timer = random.randint(150, 220)
+        elif self.level == 1:
+            self.drop_timer = random.randint(100, 160)
+        else:
+            self.drop_timer = random.randint(60, 110)
 
     def move(self):
         self.rect.x += self.speed * self.direction
@@ -753,17 +755,16 @@ class Avion(Object):
 
         win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
 
-def spawn_avion(objects, x):
+def spawn_avion(objects, level):
     direction = random.choice([-1, 1])
+    spawn_x = -1500 if direction == 1 else 3500
 
-    # Si l'avion va vers la droite (1), il commence à -1500
-    if direction == 1:
-        spawn_x = -1500
-    # S'il va vers la gauche (-1), il commence à 3500
-    else:
-        spawn_x = 3500
+    # Vitesse de l'avion selon le niveau
+    if level == 0: speed = random.randint(2, 4)
+    elif level == 1: speed = random.randint(4, 7)
+    else: speed = random.randint(6, 9)
 
-    avion = Avion(spawn_x, 0, direction, speed=random.randint(2, 5))
+    avion = Avion(spawn_x, 0, direction, speed=speed, level=level)
     objects.append(avion)
 
 class Bridge(Object):
@@ -948,8 +949,76 @@ def draw_pause_menu(window):
 
     pygame.display.update()
 
-def main(window):
+
+def show_level_transition(window, level):
+    font_titre = pygame.font.SysFont('Arial', 80, bold=True)
+    font_sous_titre = pygame.font.SysFont('Arial', 40)
+
+    if level == 0:
+        titre = "TUTORIEL"
+        sous_titre = "Triez 6 déchets pour commencer l'aventure !"
+    elif level == 1:
+        titre = "NIVEAU 1"
+        sous_titre = "Objectif : 10 déchets. Le trafic s'intensifie..."
+    elif level == 2:
+        titre = "NIVEAU 2"
+        sous_titre = "Objectif : 15 déchets. Soyez rapide !"
+    elif level == 3:
+        titre = "BOSS FINAL"
+        sous_titre = "Préparez-vous à l'affrontement !"
+    else:
+        return
+
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 200))
+    window.blit(overlay, (0, 0))
+
+    t1 = font_titre.render(titre, True, (255, 255, 255))
+    t2 = font_sous_titre.render(sous_titre, True, (200, 255, 200))
+
+    window.blit(t1, t1.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50)))
+    window.blit(t2, t2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50)))
+
+    pygame.display.update()
+    pygame.time.delay(3500)  # Met le jeu en pause 3.5 secondes pour lire
+
+
+def game_over_screen(window):
     clock = pygame.time.Clock()
+    font_titre = pygame.font.SysFont('Arial', 100, bold=True)
+    font_texte = pygame.font.SysFont('Arial', 40)
+
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 220))
+    window.blit(overlay, (0, 0))
+
+    titre = font_titre.render("VOUS ÊTES MORT", True, (255, 50, 50))
+    window.blit(titre, titre.get_rect(center=(WIDTH // 2, HEIGHT // 3)))
+
+    instructions = font_texte.render("ESPACE pour rejouer  |  ECHAP pour quitter", True, (255, 255, 255))
+    window.blit(instructions, instructions.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50)))
+
+    pygame.display.update()
+
+    while True:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    return True  # Rejouer
+                if event.key == pygame.K_ESCAPE:
+                    return False  # Quitter
+
+
+def main(window, start_level=0):
+    clock = pygame.time.Clock()
+
+    current_level = start_level
+    total_recycled = 0
+    level_goals = {0: 6, 1: 10, 2: 15, 3: 999}
+    show_level_transition(window, current_level)
 
     parallax_bg = ParallaxBackground(window)
     offset_x = 0
@@ -992,7 +1061,7 @@ def main(window):
         TrashBin(-480, HEIGHT - 175 - 96, "black"),
 
         ShadowBlock(-180, 0, 80, HEIGHT),
-        Plot(-150, 536, 48, 72),
+        Plot(-150, 436, 48, 72),
 
         Waste(block_size * 10, HEIGHT - block_size * 4 - 75,"tire.png",3),
         Waste(block_size * 11.5, HEIGHT - block_size * 4 - 75,"bottle.png",2),
@@ -1082,27 +1151,21 @@ def main(window):
             if isinstance(obj, Avion):
                 obj.update(objects)
 
-                # --- NOUVEAU : Nettoyage aux frontières fixes ---
-                # Si l'avion va vers la droite et dépasse 3500, ou vers la gauche et dépasse -1500
                 if (obj.direction == 1 and obj.rect.left > 3500) or (obj.direction == -1 and obj.rect.right < -1500):
-                    if obj in objects:
-                        objects.remove(obj)
-                    continue  # On passe à l'objet suivant
+                    if obj in objects: objects.remove(obj)
+                    continue
 
-                # Collision avec le joueur (dégâts)
                 if obj.rect.colliderect(player.hitbox):
-                    player.health -= 17
-                    if obj in objects:
-                        objects.remove(obj)
+                    player.health -= 1  # 1 SEUL DEGAT (= 1 demi-coeur)
+                    if obj in objects: objects.remove(obj)
 
             if isinstance(obj, Waste):
                 obj.update(objects)
 
                 if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
-                    player.health -= 17
+                    player.health -= 1  # 1 SEUL DEGAT (= 1 demi-coeur)
                     player.health = max(0, player.health)
-                    if obj in objects:
-                        objects.remove(obj)
+                    if obj in objects: objects.remove(obj)
                     continue
 
                 for other in objects:
@@ -1111,6 +1174,12 @@ def main(window):
                             correct_color = WASTE_TYPES.get(obj.filename)
                             if correct_color == other.color:
                                 objects.remove(obj)
+                                # --- NOUVEAU : On compte le recyclage ! ---
+                                total_recycled += 1
+                                if total_recycled >= level_goals.get(current_level, 999):
+                                    current_level += 1
+                                    total_recycled = 0
+                                    show_level_transition(window, current_level)
                             else:
                                 water.up(80)
                                 objects.remove(obj)
@@ -1121,9 +1190,16 @@ def main(window):
         avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
 
         # On ne fait spawn un avion que s'il y en a moins de 2
+        avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
         if avions_actifs < 2:
-            if random.randint(1, 180) == 1 and cpt % 5 == 0:
-                spawn_avion(objects, player.hitbox.x)
+            spawn_chance = 150 if current_level == 0 else (100 if current_level == 1 else 60)
+            if random.randint(1, spawn_chance) == 1 and cpt % 5 == 0:
+                spawn_avion(objects, current_level)
+
+        # --- Vérification de la mort ---
+        if player.health <= 0:
+            rejouer = game_over_screen(window)
+            return rejouer
 
         if player.hitbox.x <= -95 and not camera_shifted:
             saved_offset_x = offset_x
@@ -1153,9 +1229,21 @@ def main(window):
     pygame.quit()
     quit()
 
-if __name__ == "__main__":
-    # 1. On affiche le menu avec le parallax qui défile
-    main_menu(window)
 
-    # 2. Une fois le bouton cliqué, le jeu démarre
-    main(window)
+if __name__ == "__main__":
+    jeu_en_cours = True
+    niveau_depart = 0  # Lance le Tuto la première fois
+
+    while jeu_en_cours:
+        main_menu(window)
+
+        # Le jeu renvoie True si le joueur veut rejouer après un Game Over
+        vouloir_rejouer = main(window, start_level=niveau_depart)
+
+        if vouloir_rejouer:
+            niveau_depart = 1  # S'il recommence, on saute le Tuto !
+        else:
+            jeu_en_cours = False
+
+    pygame.quit()
+    quit()
