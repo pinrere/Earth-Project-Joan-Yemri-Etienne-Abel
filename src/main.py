@@ -861,6 +861,17 @@ class Water(Object):
     def up(self, dy):
         self.rect.y -= dy * self.speed
 
+class Platform(Object):
+    def __init__(self, x, y):
+        width = 120
+        height = 30
+        super().__init__(x, y, width, height, "platform")
+
+        img = pygame.image.load(join("assets", "Terrain", "plateform.png")).convert_alpha()
+        self.image = pygame.transform.scale(img, (width, height))
+
+        # IMPORTANT : collision fine (surface du dessus)
+        self.rect = pygame.Rect(x, y, width, height)
 
 def main_menu(window):
     clock = pygame.time.Clock()
@@ -1011,6 +1022,12 @@ def main(window):
     quit_btn = Button(WIDTH // 2, HEIGHT // 2 + 50, "bouttonQuitter.png")
     """
 
+    start_x = 500
+    y = HEIGHT - 300
+
+    for i in range(6):
+        objects.append(Platform(start_x + i * 120, y))
+
     run = True
     while run:
         clock.tick(FPS)
@@ -1041,6 +1058,7 @@ def main(window):
             if quit_btn.draw(window):
                 run = False
             """
+
             continue
 
         handle_move(player, objects, offset_x)
