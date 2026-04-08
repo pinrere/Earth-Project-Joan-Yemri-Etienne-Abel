@@ -11,7 +11,7 @@ pygame.init()
 pygame.display.set_caption("Eco Guardian")
 
 
-WIDTH, HEIGHT = 1422, 800
+WIDTH, HEIGHT = 1250, 700
 FPS = 60
 PLAYER_VEL = 5
 
@@ -918,6 +918,25 @@ def main_menu(window):
 
         pygame.display.update()
 
+def draw_pause_menu(window):
+    #Texte "PAUSE"
+    font = pygame.font.SysFont("arial", 80)
+    text = font.render("PAUSE", True, (255, 255, 255))
+    window.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 3))
+
+    #instructions
+    font_small = pygame.font.SysFont("arial", 40)
+    text2 = font_small.render("Appuie sur Echap pour reprendre", True, (200, 200, 200))
+    window.blit(text2, (WIDTH // 2 - text2.get_width() // 2, HEIGHT // 2))
+
+    # Dessin des boutons
+    """
+    resume_btn.draw(window)
+    quit_btn.draw(window)
+    """
+
+    pygame.display.update()
+
 def main(window):
     clock = pygame.time.Clock()
 
@@ -985,6 +1004,13 @@ def main(window):
 
     cpt = 0
 
+    paused = False
+    """
+    image a rajouter
+    resume_btn = Button(WIDTH // 2, HEIGHT // 2 - 50, "bouttonJouer.png")
+    quit_btn = Button(WIDTH // 2, HEIGHT // 2 + 50, "bouttonQuitter.png")
+    """
+
     run = True
     while run:
         clock.tick(FPS)
@@ -998,6 +1024,24 @@ def main(window):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    paused = not paused
+
+        if paused:
+            #parametre a changer une fois boutton ajouter
+            draw_pause_menu(window)
+
+            """
+            rajouter image boutton play et quitte
+            if resume_btn.draw(window):
+                paused = False
+
+            if quit_btn.draw(window):
+                run = False
+            """
+            continue
 
         handle_move(player, objects, offset_x)
         player.loop(FPS)
