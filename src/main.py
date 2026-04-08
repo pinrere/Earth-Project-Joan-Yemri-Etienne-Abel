@@ -913,10 +913,16 @@ def draw_pause_menu(window):
     text = font.render("PAUSE", True, (255, 255, 255))
     window.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 3))
 
-    #Texte instruction
+    #instructions
     font_small = pygame.font.SysFont("arial", 40)
     text2 = font_small.render("Appuie sur Echap pour reprendre", True, (200, 200, 200))
     window.blit(text2, (WIDTH // 2 - text2.get_width() // 2, HEIGHT // 2))
+
+    # Dessin des boutons
+    """
+    resume_btn.draw(window)
+    quit_btn.draw(window)
+    """
 
     pygame.display.update()
 
@@ -988,6 +994,11 @@ def main(window):
     cpt = 0
 
     paused = False
+    """
+    image a rajouter
+    resume_btn = Button(WIDTH // 2, HEIGHT // 2 - 50, "bouttonJouer.png")
+    quit_btn = Button(WIDTH // 2, HEIGHT // 2 + 50, "bouttonQuitter.png")
+    """
 
     run = True
     while run:
@@ -1008,7 +1019,17 @@ def main(window):
                     paused = not paused
 
         if paused:
+            #parametre a changer une fois boutton ajouter
             draw_pause_menu(window)
+
+            """
+            rajouter image boutton play et quitte
+            if resume_btn.draw(window):
+                paused = False
+
+            if quit_btn.draw(window):
+                run = False
+            """
             continue
 
         handle_move(player, objects, offset_x)
