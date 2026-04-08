@@ -80,37 +80,6 @@ def get_block(size_x, size_y, name):
     # (Si block_size est 96, elle restera en 96x96)
     return pygame.transform.scale(image, (size_x, size_y))
 
-
-class Button:
-    def __init__(self, x, y, name, scale=2):
-        # Charge l'image 150x50 que l'on a créée
-        path = join("assets", "Menu", "Buttons", name)
-        img = pygame.image.load(path).convert_alpha()
-
-        # Redimensionnement dynamique
-        width = img.get_width() * scale
-        height = img.get_height() * scale
-        self.image = pygame.transform.scale(img, (width, height))
-
-        self.rect = self.image.get_rect(center=(x, y))
-        self.clicked = False
-
-    def draw(self, win):
-        action = False
-        pos = pygame.mouse.get_pos()
-
-        # Survol et Clic
-        if self.rect.collidepoint(pos):
-            if pygame.mouse.get_pressed()[0] == 1 and not self.clicked:
-                self.clicked = True
-                action = True
-
-        if pygame.mouse.get_pressed()[0] == 0:
-            self.clicked = False
-
-        win.blit(self.image, (self.rect.x, self.rect.y))
-        return action
-
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 0.8
@@ -355,6 +324,7 @@ class Player(pygame.sprite.Sprite):
             return True
         return False
 
+
 class Object(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, name = None):
         super().__init__()
@@ -376,6 +346,7 @@ class ShadowBlock(Object):
 
         self.image.blit(img, (0, 0))
 
+
 class Plot(Object):
     def __init__(self, x, y, width, height):
         super().__init__(x, y, width, height, "plot")
@@ -388,6 +359,7 @@ class Plot(Object):
 
     def draw(self, win, offset_x):
         win.blit(self.image, (self.rect.x - offset_x, self.rect.y))
+
 
 class Waste(Object):
     GRAVITY = 0.8
@@ -531,6 +503,7 @@ def get_background(name):
 
     return image, width, nb_tiles
 
+
 def draw(window, bg_parallax, player, objects, offset_x):
     # 1. On dessine le fond Parallax (remplace la boucle for i in range...)
     # Cette méthode va blit 'sky', 'houses' et 'road' avec leurs propres calculs de boucle
@@ -596,6 +569,7 @@ def collide(player, objects, dx):
     player.hitbox.x -= dx
     player.rect.topleft = player.hitbox.topleft
     return collided_object
+
 
 def handle_move(player, objects, offset_x):
     keys = pygame.key.get_pressed()
@@ -745,6 +719,7 @@ class Avion(Object):
 
         win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
 
+
 def spawn_avion(objects, x):
     direction = random.choice([-1, 1])
     if direction == 1:
@@ -754,6 +729,7 @@ def spawn_avion(objects, x):
 
     avion = Avion(spawn_x, 0, direction, speed=random.randint(2, 5))
     objects.append(avion)
+
 
 class Bridge(Object):
     def __init__(self, x, y, width, bottom_img, top_img):
@@ -798,6 +774,7 @@ class ParallaxBackground:
                 self.window.blit(layer["img"], (self.width - rel_x, self.y_offset))
             else:
                 self.window.blit(layer["img"], (-self.width - rel_x, self.y_offset))
+
 
 class Water(Object):
     ANIMATION_DELAY = 10  # Environ 6 FPS (60 FPS / 10 = 6 images par seconde)
@@ -851,62 +828,6 @@ class Water(Object):
         self.rect.y -= dy * self.speed
 
 
-def main_menu(window):
-    clock = pygame.time.Clock()
-    parallax_bg = ParallaxBackground(window)
-
-    # --- CHARGEMENT DES BLOCS POUR LE SOL ---
-    block_size = 96
-    grass_img = get_block(block_size, block_size, "dirtGrassBlock.png")
-    dirt_img = get_block(block_size, block_size, "dirtBlock.png")
-
-    # --- BOUTON : Plus gros et décalé à gauche ---
-    # On le place à 1/3 de la largeur de l'écran
-    play_btn = Button(WIDTH // 3 +100, HEIGHT // 2, "bouttonJouer.png")
-    # Si tu veux le grossir via code (ex: scale=2), assure-t-on que la classe Button le gère
-    # Ici on part du principe que l'image 150x50 est affichée
-
-    # --- LE JOUEUR : On crée une instance juste pour le menu ---
-    # On le place à droite du bouton
-    menu_player = Player(WIDTH // 3 + 350, HEIGHT // 2 - 50, 60, 96)
-    menu_player.direction = "right"  # Il regarde vers la droite (ou le bouton)
-
-    menu_scroll = 0
-    run_menu = True
-
-    while run_menu:
-        clock.tick(FPS)
-        menu_scroll += 2  # Vitesse de défilement
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-
-        # 1. Dessin du Parallax (Ciel, Maisons, Route)
-        parallax_bg.draw(menu_scroll)
-
-        # 2. Dessin du SOL (2 lignes de blocs)
-        # On calcule le décalage pour que le sol boucle parfaitement
-        for i in range(-1, (WIDTH // block_size) + 2):
-            # On utilise la vitesse de la route (0.7 dans ton Parallax) pour que le sol soit raccord
-            x_pos = (i * block_size) - ((menu_scroll * 0.7) % block_size)
-            window.blit(grass_img, (x_pos, HEIGHT - block_size * 2))
-            window.blit(dirt_img, (x_pos, HEIGHT - block_size))
-
-        # 3. Animation et Dessin du Joueur
-        menu_player.x_vel = 0  # On s'assure qu'il reste en "Idle"
-        menu_player.update_sprite()
-        # On le dessine sans offset_x car il est fixe à l'écran dans le menu
-        window.blit(menu_player.sprite, (menu_player.hitbox.x - menu_player.sprite_offset_x,
-                                         menu_player.hitbox.y - menu_player.sprite_offset_y))
-
-        # 4. Dessin du Bouton
-        if play_btn.draw(window):
-            run_menu = False
-
-        pygame.display.update()
-
 def main(window):
     clock = pygame.time.Clock()
 
@@ -925,6 +846,7 @@ def main(window):
     # sans changer la hauteur pour respecter ton souhait
     bridge_width = 308
 
+
     # Positionnement au niveau du trou (index 3)
     bridge_x = 3 * block_size - 10
     bridge_y = HEIGHT - block_size * 2 # Aligné sur le haut du sol
@@ -937,6 +859,7 @@ def main(window):
     left_wall = [Block(-960, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
     left_left__wall = [Block(-1056, j * block_size, block_size,"dirtBlock.png") if j != 0 else Block(-1056, j * block_size, block_size,"dirtGrassBlock.png") for j in range(-5,9)]
     left_left_left_wall = [Block(-1152, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-1152, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
+
 
     objects = [
         bridge,
@@ -1062,12 +985,11 @@ def main(window):
         # --- AJOUT ETAPE 5 : DESSIN ---
         draw(window, parallax_bg, player, objects, offset_x)
 
+
+
+
     pygame.quit()
     quit()
 
 if __name__ == "__main__":
-    # 1. On affiche le menu avec le parallax qui défile
-    main_menu(window)
-
-    # 2. Une fois le bouton cliqué, le jeu démarre
     main(window)
