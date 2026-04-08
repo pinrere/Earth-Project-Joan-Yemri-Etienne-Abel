@@ -418,7 +418,8 @@ class Waste(Object):
     def hit_vertical(self, objects):
         self.rect.y += self.y_vel
         for obj in objects:
-            if isinstance(obj, Block):  # ← collision seulement avec les blocs
+            # --- MODIFICATION ICI AUSSI (au cas où tu l'utilises) ---
+            if isinstance(obj, Block) or isinstance(obj, Bridge):
                 if self.rect.colliderect(obj.rect):
                     self.rect.bottom = obj.rect.top
                     self.y_vel = 0
@@ -440,7 +441,8 @@ class Waste(Object):
         self.rect.x = int(self.pos_x)
 
         for obj in objects:
-            if isinstance(obj, Block) and self.rect.colliderect(obj.rect):
+            # --- MODIFICATION : Prise en compte du pont ---
+            if (isinstance(obj, Block) or isinstance(obj, Bridge)) and self.rect.colliderect(obj.rect):
 
                 if self.x_vel > 0:
                     self.rect.right = obj.rect.left
@@ -461,7 +463,8 @@ class Waste(Object):
         self.on_ground = False
 
         for obj in objects:
-            if isinstance(obj, Block) and self.rect.colliderect(obj.rect):
+            # --- MODIFICATION : Prise en compte du pont ---
+            if (isinstance(obj, Block) or isinstance(obj, Bridge)) and self.rect.colliderect(obj.rect):
 
                 # --- SOL ---
                 if self.y_vel > 0:
@@ -485,7 +488,7 @@ class Waste(Object):
 
         if self.on_ground:
             self.is_launched = False
-            self.x_vel *= 0.9  # Friction au sol pour l'arrêter plus vite
+            self.x_vel *= 0.9
 
 class Block(Object):
     def __init__(self, x, y, size_y, name, size_x=96):
@@ -661,38 +664,47 @@ def handle_move(player, objects, offset_x):
 
 
 class Avion(Object):
-    # 0.5 secondes à 60 FPS = 30 frames
-    OPEN_DURATION = 30
+    # Vitesse de l'animation (plus c'est bas, plus les frames défilent vite)
+    ANIMATION_DELAY = 15
 
     def __init__(self, x, y, direction=1, speed=3):
-        # --- CHARGEMENT DES IMAGES ---
-        # On construit le chemin : assets/Items/Plane/planeClosed.png
-        path_closed = join("assets", "Items", "Plane", "planeClosed.png")
-        path_open = join("assets", "Items", "Plane", "planeOpen.png")
+        # --- CHARGEMENT DU SPRITESHEET ---
+        path = join("assets", "Items", "Plane", "planeSprite.png")
+        sprite_sheet = pygame.image.load(path).convert_alpha()
 
-        self.img_closed = pygame.image.load(path_closed).convert_alpha()
-        self.img_open = pygame.image.load(path_open).convert_alpha()
+        self.sprites = []
+        frame_width = 350
+        frame_height = 150
 
-        # On redimensionne (x3 pour que ce soit bien visible)
-        scale = 3
-        self.img_closed = pygame.transform.scale_by(self.img_closed, scale)
-        self.img_open = pygame.transform.scale_by(self.img_open, scale)
+        # J'ai mis le scale à 1 car 350x150 c'est déjà assez grand.
+        # Si c'est trop petit, passe-le à 1.5 ou 2 !
+        scale = 1
 
-        width = self.img_closed.get_width()
-        height = self.img_closed.get_height()
+        # Découpage des 7 images
+        for i in range(7):
+            surface = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA, 32)
+            rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+            surface.blit(sprite_sheet, (0, 0), rect)
+
+            if scale != 1:
+                surface = pygame.transform.scale_by(surface, scale)
+
+            self.sprites.append(surface)
+
+        width = self.sprites[0].get_width()
+        height = self.sprites[0].get_height()
 
         super().__init__(x, y, width, height, "avion")
 
         self.direction = direction  # 1 = droite, -1 = gauche
         self.speed = speed
 
-        # Timers pour le largage
+        # --- VARIABLES D'ANIMATION ET LARGAGE ---
+        self.animation_count = 0
         self.reset_drop_timer()
-        self.is_open = False
-        self.post_drop_timer = 0
 
     def reset_drop_timer(self):
-        # L'avion lâche un truc toutes les 2 à 5 secondes
+        # L'avion lâche un truc toutes les 2 à 5 secondes (à 60 FPS)
         self.drop_timer = random.randint(120, 300)
 
     def move(self):
@@ -700,57 +712,56 @@ class Avion(Object):
 
     def update(self, objects):
         self.move()
+
+        # Fait avancer l'animation
+        self.animation_count += 1
+
+        # Gestion du timer de largage
         self.drop_timer -= 1
 
-        # 1. On ouvre 0.5s (30 frames) AVANT le largage
-        if self.drop_timer <= self.OPEN_DURATION:
-            self.is_open = True
-
-        # 2. Le moment du largage
         if self.drop_timer <= 0:
-            self.drop_waste(objects)
-            self.reset_drop_timer()
-            self.post_drop_timer = self.OPEN_DURATION  # On garde ouvert 0.5s APRES
+            # --- NOUVEAU : Zone de largage autorisée ---
+            # L'avion ne lâche un objet que s'il est entre -140 et 3000
+            if -140 <= self.rect.x <= 3000:
+                self.drop_waste(objects)
 
-        # 3. Gestion de la fermeture après le délai
-        if self.post_drop_timer > 0:
-            self.post_drop_timer -= 1
-        elif self.drop_timer > self.OPEN_DURATION:
-            # On ne referme que si on n'est pas déjà dans la phase "avant largage"
-            self.is_open = False
+            # On réinitialise le timer quoi qu'il arrive,
+            # pour qu'il continue son cycle normalement
+            self.reset_drop_timer()
 
     def drop_waste(self, objects):
         # On fait apparaître le déchet au niveau de la soute (arrière de l'avion)
-        # Si direction = -1 (gauche), l'arrière est à droite de l'image
         trash_x = self.rect.right - 20 if self.direction == -1 else self.rect.left + 20
         trash_y = self.rect.bottom - 15
 
         random_file = random.choice(["tire.png", "bottle.png", "glassBottle.png", "trashBag.png", "cardboard.png"])
 
-        # Petit ajustement de scale selon l'objet pour que ce soit réaliste
-        scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7}
-        s = scales.get(random_file, 2)
+        scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7,"bottle.png":2,"trashBag.png":3}
+        s = scales.get(random_file, 3)
 
         trash = Waste(trash_x, trash_y, random_file, scale=s, vel_x=self.speed * self.direction, vel_y=2)
         objects.append(trash)
 
     def draw(self, win, offset_x):
-        # Choix de l'image selon l'état soute ouverte/fermée
-        sprite = self.img_open if self.is_open else self.img_closed
+        # Choix de l'image selon l'avancement de l'animation
+        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(self.sprites)
+        sprite = self.sprites[sprite_index]
 
-        # Ton dessin original pointe vers la gauche.
-        # Si direction = 1 (droite), on flippe l'image horizontalement.
-        if self.direction == 1:
+        # Si l'avion va vers la gauche (-1), on retourne l'image
+        if self.direction == -1:
             sprite = pygame.transform.flip(sprite, True, False)
 
         win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
 
 def spawn_avion(objects, x):
     direction = random.choice([-1, 1])
+
+    # Si l'avion va vers la droite (1), il commence à -1500
     if direction == 1:
-        spawn_x = x - 200
+        spawn_x = -1500
+    # S'il va vers la gauche (-1), il commence à 3500
     else:
-        spawn_x = x + WIDTH + 200
+        spawn_x = 3500
 
     avion = Avion(spawn_x, 0, direction, speed=random.randint(2, 5))
     objects.append(avion)
@@ -1008,7 +1019,16 @@ def main(window):
 
             if isinstance(obj, Avion):
                 obj.update(objects)
-                if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0:
+
+                # --- NOUVEAU : Nettoyage aux frontières fixes ---
+                # Si l'avion va vers la droite et dépasse 3500, ou vers la gauche et dépasse -1500
+                if (obj.direction == 1 and obj.rect.left > 3500) or (obj.direction == -1 and obj.rect.right < -1500):
+                    if obj in objects:
+                        objects.remove(obj)
+                    continue  # On passe à l'objet suivant
+
+                # Collision avec le joueur (dégâts)
+                if obj.rect.colliderect(player.hitbox):
                     player.health -= 17
                     if obj in objects:
                         objects.remove(obj)
@@ -1034,8 +1054,14 @@ def main(window):
                                 objects.remove(obj)
                             break
 
-        if random.randint(1, 180) == 1 and cpt % 5 == 0:
-            spawn_avion(objects, player.hitbox.x)
+            # --- NOUVEAU : Limite de 2 avions actifs max ---
+            # On compte combien d'avions sont actuellement dans la liste des objets
+        avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
+
+        # On ne fait spawn un avion que s'il y en a moins de 2
+        if avions_actifs < 2:
+            if random.randint(1, 180) == 1 and cpt % 5 == 0:
+                spawn_avion(objects, player.hitbox.x)
 
         if player.hitbox.x <= -95 and not camera_shifted:
             saved_offset_x = offset_x
