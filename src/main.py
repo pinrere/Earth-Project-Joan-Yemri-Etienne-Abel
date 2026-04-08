@@ -426,15 +426,14 @@ class Waste(Object):
     def hit_vertical(self, objects):
         self.rect.y += self.y_vel
         for obj in objects:
-            # --- MODIFICATION ICI AUSSI (au cas où tu l'utilises) ---
-            if isinstance(obj, Block) or isinstance(obj, Bridge):
+            # --- AJOUT : Collision avec les plateformes ---
+            if isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform):
                 if self.rect.colliderect(obj.rect):
                     self.rect.bottom = obj.rect.top
                     self.y_vel = 0
                     break
 
     def update(self, objects):
-
         # --- GRAVITÉ seulement si pas au sol ---
         if not self.on_ground:
             self.y_vel += self.GRAVITY
@@ -449,8 +448,8 @@ class Waste(Object):
         self.rect.x = int(self.pos_x)
 
         for obj in objects:
-            # --- MODIFICATION : Prise en compte du pont ---
-            if (isinstance(obj, Block) or isinstance(obj, Bridge)) and self.rect.colliderect(obj.rect):
+            # --- AJOUT : Collision avec les plateformes ---
+            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
 
                 if self.x_vel > 0:
                     self.rect.right = obj.rect.left
@@ -471,8 +470,8 @@ class Waste(Object):
         self.on_ground = False
 
         for obj in objects:
-            # --- MODIFICATION : Prise en compte du pont ---
-            if (isinstance(obj, Block) or isinstance(obj, Bridge)) and self.rect.colliderect(obj.rect):
+            # --- AJOUT : Collision avec les plateformes ---
+            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
 
                 # --- SOL ---
                 if self.y_vel > 0:
@@ -1012,12 +1011,21 @@ def game_over_screen(window):
                     return False  # Quitter
 
 
+
 def main(window, start_level=0):
     clock = pygame.time.Clock()
 
     current_level = start_level
     total_recycled = 0
-    level_goals = {0: 6, 1: 10, 2: 15, 3: 999}
+    # Le boss final (3) demande maintenant 20 déchets
+    level_goals = {0: 6, 1: 10, 2: 15, 3: 20}
+
+    # Temps alloué par niveau (en secondes) : Tuto=60s, N1=90s, N2=120s, Boss=180s
+    level_times = {0: 60, 1: 90, 2: 120, 3: 180}
+
+    # On convertit le temps en frames (60 frames par seconde)
+    frames_left = level_times.get(current_level, 60) * FPS
+
     show_level_transition(window, current_level)
 
     parallax_bg = ParallaxBackground(window)
