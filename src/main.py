@@ -141,8 +141,9 @@ class Player(pygame.sprite.Sprite):
         self.inventory = []
         self.throw_cooldown = 0
         self.slot_image = pygame.Surface((60, 60), pygame.SRCALPHA)
-        pygame.draw.rect(self.slot_image, (100, 100, 100, 150), (0, 0, 60, 60),border_radius=5)  # Fond gris semi-transparent
-        pygame.draw.rect(self.slot_image, (255, 255, 255), (0, 0, 60, 60), 2, border_radius=5)  # Bordure blanche
+        pygame.draw.rect(self.slot_image, (100, 100, 100, 150), (0, 0, 60, 60), border_radius=5)
+        pygame.draw.rect(self.slot_image, (255, 255, 255), (0, 0, 60, 60), 2, border_radius=5)
+        self.water_timer = 0  # <--- NOUVEAU : Chrono pour la noyade
 
     HEART_IMG = pygame.image.load(join("assets", "Other", "heart.png")).convert_alpha()
 
@@ -586,9 +587,6 @@ def handle_vertical_collision(player, objects):
                 player.hitbox.top = obj.rect.bottom
                 player.y_vel = 0
 
-            if isinstance(obj, Water):
-                player.make_hit()
-
             collided.append(obj)
 
     player.rect.topleft = player.hitbox.topleft
@@ -952,10 +950,21 @@ def draw_pause_menu(window):
 def show_level_transition(window, level):
     font_titre = pygame.font.SysFont('Arial', 80, bold=True)
     font_sous_titre = pygame.font.SysFont('Arial', 40)
+    # Police un peu plus petite pour les consignes
+    font_instructions = pygame.font.SysFont('Arial', 30)
+
+    instructions_tuto = []
 
     if level == 0:
-        titre = "TUTORIEL"
+        titre = "Niveau 0"
         sous_titre = "Triez 6 déchets pour commencer l'aventure !"
+        # On définit les règles du tri ici
+        instructions_tuto = [
+            "Poubelle Verte : Verre",
+            "Poubelle Jaune : Bouteilles plastiques & Cartons",
+            "Poubelle Noire : Pneus & Sacs poubelles",
+            "Touche 'E' = Ramasser  |  'MAJ (Shift) + Clic' = Lancer"
+        ]
     elif level == 1:
         titre = "NIVEAU 1"
         sous_titre = "Objectif : 10 déchets. Le trafic s'intensifie..."
@@ -975,11 +984,22 @@ def show_level_transition(window, level):
     t1 = font_titre.render(titre, True, (255, 255, 255))
     t2 = font_sous_titre.render(sous_titre, True, (200, 255, 200))
 
-    window.blit(t1, t1.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50)))
-    window.blit(t2, t2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50)))
+    # On a remonté un peu le titre et le sous-titre pour faire de la place
+    window.blit(t1, t1.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 120)))
+    window.blit(t2, t2.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 40)))
+
+    # On affiche chaque ligne d'instruction (seulement s'il y en a)
+    for i, ligne in enumerate(instructions_tuto):
+        texte = font_instructions.render(ligne, True, (200, 200, 255))
+        window.blit(texte, texte.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 30 + (i * 35))))
 
     pygame.display.update()
-    pygame.time.delay(3500)  # Met le jeu en pause 3.5 secondes pour lire
+
+    # On met une pause de 4.5 secondes (au lieu de 3.5) au Tuto pour avoir le temps de lire
+    if level == 0:
+        pygame.time.delay(4500)
+    else:
+        pygame.time.delay(3500)  # Met le jeu en pause 3.5 secondes pour lire
 
 
 def game_over_screen(window):
@@ -1071,11 +1091,9 @@ def main(window, start_level=0):
         ShadowBlock(-180, 0, 80, HEIGHT),
         Plot(-150, 436, 48, 72),
 
-        Waste(block_size * 10, HEIGHT - block_size * 4 - 75,"tire.png",3),
-        Waste(block_size * 11.5, HEIGHT - block_size * 4 - 75,"bottle.png",2),
-        Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "glassBottle.png", 1),
-        Waste(block_size * 13, HEIGHT - block_size * 4 - 75,"trashBag.png"),
-        Waste(block_size * 14, HEIGHT - block_size * 4 - 75,"cardboard.png",2.7),
+        # On garde 1 déchet pour la poubelle Verte (verre) et 1 pour la Jaune (carton)
+        Waste(block_size * 10, HEIGHT - block_size * 4 - 75, "glassBottle.png", 1),
+        Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "cardboard.png", 2.7),
 
     ]
 
@@ -1155,6 +1173,18 @@ def main(window, start_level=0):
 
             if isinstance(obj, Water):
                 obj.update()
+
+                # --- NOUVEAU : Dégâts de l'eau (1 demi-coeur toutes les 2s) ---
+                if player.hitbox.colliderect(obj.rect):
+                    player.water_timer += 1
+
+                    if player.water_timer >= FPS * 2:  # Au bout de 2 secondes (120 frames)
+                        player.health -= 1  # -1 demi-coeur
+                        player.make_hit()  # Fait clignoter le perso en rouge
+                        player.water_timer = 0  # On remet à zéro pour les 2 prochaines secondes
+                else:
+                    # Si le joueur sort de l'eau, le chrono retombe à zéro
+                    player.water_timer = 0
 
             if isinstance(obj, Avion):
                 obj.update(objects)
