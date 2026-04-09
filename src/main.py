@@ -7,11 +7,9 @@ from os.path import isfile, join
 from collections import defaultdict
 pygame.init()
 
-
 pygame.display.set_caption("Eco Guardian")
 
-
-WIDTH, HEIGHT = 1250, 700
+WIDTH, HEIGHT = 1400, 800
 FPS = 60
 PLAYER_VEL = 5
 
@@ -48,7 +46,7 @@ def load_sprites_from_folder(dir1, dir2, scale=2, direction=False):
 
 def load_sprite_sheets(dir1, dir2, width, height, direction = False):
     path = join("assets", dir1, dir2)
-    images = [f for f in listdir(path) if isfile(join(path, f))] #lire tous les fichiers dans un dossier jcrois
+    images = [f for f in listdir(path) if isfile(join(path, f))]
 
     all_sprites = {}
 
@@ -59,7 +57,7 @@ def load_sprite_sheets(dir1, dir2, width, height, direction = False):
         for i in range(sprite_sheet.get_width() // width):
             surface = pygame.Surface((width, height), pygame.SRCALPHA, 32)
             rect = pygame.Rect(i * width, 0, width, height)
-            surface.blit(sprite_sheet, (0, 0), rect) #blit = draw
+            surface.blit(sprite_sheet, (0, 0), rect)
             sprites.append(pygame.transform.scale2x(surface))
 
         if direction:
@@ -70,24 +68,16 @@ def load_sprite_sheets(dir1, dir2, width, height, direction = False):
 
     return all_sprites
 
-
 def get_block(size_x, size_y, name):
-    # On charge directement ton nouveau fichier extrait
     path = join("assets", "Terrain", name)
     image = pygame.image.load(path).convert_alpha()
-
-    # On redimensionne l'image à la taille voulue pour le jeu
-    # (Si block_size est 96, elle restera en 96x96)
     return pygame.transform.scale(image, (size_x, size_y))
-
 
 class Button:
     def __init__(self, x, y, name, scale=2):
-        # Charge l'image 150x50 que l'on a créée
         path = join("assets", "Menu", "Buttons", name)
         img = pygame.image.load(path).convert_alpha()
 
-        # Redimensionnement dynamique
         width = img.get_width() * scale
         height = img.get_height() * scale
         self.image = pygame.transform.scale(img, (width, height))
@@ -99,7 +89,6 @@ class Button:
         action = False
         pos = pygame.mouse.get_pos()
 
-        # Survol et Clic
         if self.rect.collidepoint(pos):
             if pygame.mouse.get_pressed()[0] == 1 and not self.clicked:
                 self.clicked = True
@@ -135,15 +124,14 @@ class Player(pygame.sprite.Sprite):
         self.health = 6
         self.trash_collected = 0
         self.MAX_TRASH = 3
-        # Pour l'affichage des carrés des déchets
-        self.trash_icon_size = 8  # taille des carrés
-        self.trash_icon_spacing = 7  # espace entre les carrés
+        self.trash_icon_size = 8
+        self.trash_icon_spacing = 7
         self.inventory = []
         self.throw_cooldown = 0
         self.slot_image = pygame.Surface((60, 60), pygame.SRCALPHA)
         pygame.draw.rect(self.slot_image, (100, 100, 100, 150), (0, 0, 60, 60), border_radius=5)
         pygame.draw.rect(self.slot_image, (255, 255, 255), (0, 0, 60, 60), 2, border_radius=5)
-        self.water_timer = 0  # <--- NOUVEAU : Chrono pour la noyade
+        self.water_timer = 0
 
     HEART_IMG = pygame.image.load(join("assets", "Other", "heart.png")).convert_alpha()
 
@@ -155,10 +143,8 @@ class Player(pygame.sprite.Sprite):
              int(self.HEART_IMG.get_height() * heart_scale))
         )
 
-        # On crée dynamiquement l'image du demi-cœur (moitié gauche)
         half_heart = heart.subsurface((0, 0, heart.get_width() // 2, heart.get_height()))
 
-        # On crée le cœur grisé pour le fond
         grey = heart.copy()
         grey.fill((80, 80, 80, 180), special_flags=pygame.BLEND_RGBA_MULT)
 
@@ -169,13 +155,10 @@ class Player(pygame.sprite.Sprite):
         for i in range(3):
             x_pos = bar_x + i * spacing
 
-            # 1. On dessine toujours le fond gris
             win.blit(grey, (x_pos, bar_y))
 
-            # 2. Cœur plein si la vie est suffisante (ex: 2 PV pour le 1er cœur)
             if self.health >= (i + 1) * 2:
                 win.blit(heart, (x_pos, bar_y))
-            # 3. Demi-cœur si le chiffre est impair
             elif self.health == (i * 2) + 1:
                 win.blit(half_heart, (x_pos, bar_y))
 
@@ -207,28 +190,24 @@ class Player(pygame.sprite.Sprite):
         padding = 20
         slot_size = 60
         gap = 10
-        target_max = 40  # La taille maximale souhaitée (longueur ou largeur)
+        target_max = 40
 
         start_x = WIDTH - padding - slot_size
         start_y = padding
 
-        # 1. Dessiner les slots vides
         for i in range(self.MAX_TRASH):
             x = start_x - (i * (slot_size + gap))
             win.blit(self.slot_image, (x, start_y))
 
-        # 2. Dessiner les objets
         for i, item_data in enumerate(reversed(self.inventory)):
             if i < self.MAX_TRASH:
                 filename, _ = item_data
                 path = join("assets", "Items", "Waste", filename)
                 item_img = pygame.image.load(path).convert_alpha()
 
-                # --- REDIMENSIONNEMENT PROPORTIONNEL ---
                 original_width = item_img.get_width()
                 original_height = item_img.get_height()
 
-                # On cherche le ratio pour que le plus grand côté soit égal à target_max
                 ratio = target_max / max(original_width, original_height)
 
                 new_width = int(original_width * ratio)
@@ -236,11 +215,8 @@ class Player(pygame.sprite.Sprite):
 
                 item_img = pygame.transform.scale(item_img, (new_width, new_height))
 
-                # --- CENTRAGE DYNAMIQUE ---
-                # On calcule la position pour que l'image soit bien au milieu du slot de 60px
                 x_slot = start_x - (i * (slot_size + gap))
 
-                # Offset = (Taille du slot - Taille de l'image) / 2
                 pos_x = x_slot + (slot_size - new_width) // 2
                 pos_y = start_y + (slot_size - new_height) // 2
 
@@ -280,14 +256,11 @@ class Player(pygame.sprite.Sprite):
             self.animation_count = 0
 
     def loop(self, fps):
-        # Gravité
         self.y_vel += self.GRAVITY
 
-        # --- Mouvement horizontal ---
         self.hitbox.x += self.x_vel
         self.rect.topleft = self.hitbox.topleft
 
-        # --- Mouvement vertical ---
         self.hitbox.y += self.y_vel
         self.rect.topleft = self.hitbox.topleft
 
@@ -358,7 +331,7 @@ class Player(pygame.sprite.Sprite):
     def collect_trash(self, obj, objects):
         if self.trash_collected < self.MAX_TRASH:
             self.trash_collected += 1
-            self.inventory.append((obj.filename, obj.scale)) # <--- On stocke le nom du fichier image
+            self.inventory.append((obj.filename, obj.scale))
             if obj in objects:
                 objects.remove(obj)
             return True
@@ -388,11 +361,9 @@ class ShadowBlock(Object):
 class Plot(Object):
     def __init__(self, x, y, width, height):
         super().__init__(x, y, width, height, "plot")
-        # On charge l'image du plot
         path = join("assets", "Other", "Plot.png")
         img = pygame.image.load(path).convert_alpha()
 
-        # On redimensionne l'image pour qu'elle corresponde à la taille voulue
         self.image = pygame.transform.scale(img, (width, height))
 
     def draw(self, win, offset_x):
@@ -414,7 +385,6 @@ class Waste(Object):
         super().__init__(x, y, width, height, name)
         self.image.blit(pygame.transform.scale(img, (width, height)), (0, 0))
 
-        # On stocke le nom du fichier pour pouvoir le réutiliser lors du lancer
         self.filename = filename
         self.collected = False
         self.y_vel = vel_y
@@ -427,7 +397,6 @@ class Waste(Object):
     def hit_vertical(self, objects):
         self.rect.y += self.y_vel
         for obj in objects:
-            # --- AJOUT : Collision avec les plateformes ---
             if isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform):
                 if self.rect.colliderect(obj.rect):
                     self.rect.bottom = obj.rect.top
@@ -435,21 +404,15 @@ class Waste(Object):
                     break
 
     def update(self, objects):
-        # --- GRAVITÉ seulement si pas au sol ---
         if not self.on_ground:
             self.y_vel += self.GRAVITY
 
-        # --- FRICTION AIR ---
         self.x_vel *= self.FRICTION
 
-        # =====================
-        #   MOUVEMENT X
-        # =====================
         self.pos_x += self.x_vel
         self.rect.x = int(self.pos_x)
 
         for obj in objects:
-            # --- AJOUT : Collision avec les plateformes ---
             if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
 
                 if self.x_vel > 0:
@@ -459,22 +422,16 @@ class Waste(Object):
 
                 self.pos_x = self.rect.x
 
-                # rebond mur
                 self.x_vel *= -self.BOUNCE_DAMPING
 
-        # =====================
-        #   MOUVEMENT Y
-        # =====================
         self.pos_y += self.y_vel
         self.rect.y = int(self.pos_y)
 
         self.on_ground = False
 
         for obj in objects:
-            # --- AJOUT : Collision avec les plateformes ---
             if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
 
-                # --- SOL ---
                 if self.y_vel > 0:
                     self.rect.bottom = obj.rect.top
                     self.pos_y = self.rect.y
@@ -482,13 +439,11 @@ class Waste(Object):
                     self.y_vel *= -self.BOUNCE_DAMPING
                     self.x_vel *= 0.8
 
-                    # Si rebond trop faible → stop total
                     if abs(self.y_vel) < self.STOP_THRESHOLD:
                         self.y_vel = 0
                         self.x_vel = 0
                         self.on_ground = True
 
-                # --- PLAFOND ---
                 elif self.y_vel < 0:
                     self.rect.top = obj.rect.bottom
                     self.pos_y = self.rect.y
@@ -501,7 +456,6 @@ class Waste(Object):
 class Block(Object):
     def __init__(self, x, y, size_y, name, size_x=96):
         super().__init__(x, y, size_x, size_y)
-        # On récupère l'image redimensionnée
         self.image = get_block(size_x, size_y, name)
         self.rect = pygame.Rect(x, y, size_x, size_y)
 
@@ -539,12 +493,9 @@ def get_background(name):
     _, _, width, height = image.get_rect()
     nb_tiles = math.ceil(WIDTH / width) + 2
 
-
     return image, width, nb_tiles
 
 def draw(window, bg_parallax, player, objects, offset_x):
-    # 1. On dessine le fond Parallax (remplace la boucle for i in range...)
-    # Cette méthode va blit 'sky', 'houses' et 'road' avec leurs propres calculs de boucle
     bg_parallax.draw(offset_x)
 
     for obj in objects:
@@ -552,7 +503,6 @@ def draw(window, bg_parallax, player, objects, offset_x):
             obj.draw(window, offset_x)
 
 
-    # 2. Dessin des objets du monde (inchangé)
     for obj in objects:
         if isinstance(obj, Water):
             continue
@@ -562,7 +512,6 @@ def draw(window, bg_parallax, player, objects, offset_x):
             continue
         obj.draw(window, offset_x)
 
-    # 3. Dessin du joueur et de ses barres d'état (inchangé)
     player.draw(window, offset_x)
     player.draw_health_bar(window, offset_x)
     player.draw_trajectory(window, offset_x)
@@ -576,13 +525,11 @@ def handle_vertical_collision(player, objects):
     for obj in objects:
         if player.hitbox.colliderect(obj.rect):
 
-            # Collision sol
             if player.y_vel > 0:
                 player.hitbox.bottom = obj.rect.top
                 player.y_vel = 0
                 player.jump_count = 0
 
-            # Collision plafond
             elif player.y_vel < 0:
                 player.hitbox.top = obj.rect.bottom
                 player.y_vel = 0
@@ -613,54 +560,41 @@ def handle_move(player, objects, offset_x):
     collide_left = collide(player, objects, -PLAYER_VEL)
     collide_right = collide(player, objects, PLAYER_VEL)
 
-    # --- MOUVEMENTS HORIZONTAUX ---
     if keys[pygame.K_q] and not collide_left:
         player.move_left(PLAYER_VEL)
     if keys[pygame.K_d] and not collide_right:
         player.move_right(PLAYER_VEL)
 
-    # --- COLLISIONS VERTICALES ---
     handle_vertical_collision(player, objects)
 
-    # --- RAMASSAGE DES DÉCHETS (Touche E) ---
     for obj in objects:
-        if isinstance(obj, Waste):  # Détecte tous les types de déchets
-            # On vérifie si le joueur est proche de l'objet
+        if isinstance(obj, Waste):
             if player.hitbox.colliderect(obj.rect.inflate(20, 20)):
                 if keys[pygame.K_e]:
-                    # On ramasse l'objet et on l'ajoute à l'inventaire du joueur
                     if player.collect_trash(obj, objects):
-                        break  # On ne ramasse qu'un objet à la fois par appui
+                        break
 
-    # --- LANCER DES DÉCHETS (Shift + Clic Gauche) ---
     if keys[pygame.K_LSHIFT] and player.trash_collected > 0 and player.throw_cooldown == 0:
         if mouse_buttons[0]:
-            # Calcul de la position de la souris par rapport au joueur
             m_x, m_y = pygame.mouse.get_pos()
             player_screen_x = player.hitbox.centerx - offset_x
 
-            # Calcul de la force du lancer
             v_x = (m_x - player_screen_x) * 0.05
             v_y = (m_y - player.hitbox.centery) * 0.12
 
-            # Limitation de la vitesse max
             MAX_SPEED = 30
             v_x = max(min(v_x, MAX_SPEED), -MAX_SPEED)
             v_y = max(min(v_y, MAX_SPEED), -MAX_SPEED)
 
-            # Position de départ du déchet lancé (gauche ou droite du joueur)
             if m_x > player_screen_x:
                 spawn_x = player.hitbox.right + 10
             else:
                 spawn_x = player.hitbox.left - 60
             spawn_y = player.hitbox.top + 10
 
-            # --- LOGIQUE DYNAMIQUE ---
-            # On récupère le nom du fichier de l'objet ramassé en dernier
             if len(player.inventory) > 0:
                 last_item_file,scale = player.inventory.pop()
 
-                # On crée le nouveau projectile avec la BONNE image
                 launched_item = Waste(spawn_x, spawn_y, last_item_file, scale,vel_x=v_x, vel_y=v_y)
                 objects.append(launched_item)
 
@@ -669,17 +603,18 @@ def handle_move(player, objects, offset_x):
 
 
 class Avion(Object):
-    # Vitesse de l'animation (plus c'est bas, plus les frames défilent vite)
-    ANIMATION_DELAY = 15
+    """Gère l'avion qui traverse l'écran et largue des déchets."""
+    ANIMATION_DELAY = 15  # Vitesse de l'animation (plus c'est bas, plus c'est rapide)
 
     def __init__(self, x, y, direction=1, speed=3, level=0):
-        # (Garde tout le chargement du sprite ici...)
+        # Chargement et découpage du sprite sheet de l'avion
         path = join("assets", "Items", "Plane", "planeSprite.png")
         sprite_sheet = pygame.image.load(path).convert_alpha()
         self.sprites = []
         frame_width = 350
         frame_height = 150
         scale = 1
+
         for i in range(7):
             surface = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA, 32)
             rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
@@ -687,6 +622,7 @@ class Avion(Object):
             if scale != 1:
                 surface = pygame.transform.scale_by(surface, scale)
             self.sprites.append(surface)
+
         width = self.sprites[0].get_width()
         height = self.sprites[0].get_height()
         super().__init__(x, y, width, height, "avion")
@@ -694,11 +630,11 @@ class Avion(Object):
         self.direction = direction
         self.speed = speed
         self.animation_count = 0
-        self.level = level  # On sauvegarde le niveau
+        self.level = level
         self.reset_drop_timer()
 
     def reset_drop_timer(self):
-        # Plus le niveau est haut, plus le drop est rapide
+        """Définit le temps avant le prochain largage selon le niveau."""
         if self.level == 0:
             self.drop_timer = random.randint(150, 220)
         elif self.level == 1:
@@ -707,87 +643,83 @@ class Avion(Object):
             self.drop_timer = random.randint(60, 110)
 
     def move(self):
+        """Déplace l'avion horizontalement."""
         self.rect.x += self.speed * self.direction
 
     def update(self, objects):
+        """Met à jour la position, l'animation et gère le largage."""
         self.move()
-
-        # Fait avancer l'animation
         self.animation_count += 1
-
-        # Gestion du timer de largage
         self.drop_timer -= 1
 
+        # Zone de largage autorisée
         if self.drop_timer <= 0:
-            # --- NOUVEAU : Zone de largage autorisée ---
-            # L'avion ne lâche un objet que s'il est entre -140 et 3000
             if -140 <= self.rect.x <= 3000:
                 self.drop_waste(objects)
-
-            # On réinitialise le timer quoi qu'il arrive,
-            # pour qu'il continue son cycle normalement
             self.reset_drop_timer()
 
     def drop_waste(self, objects):
-        # On fait apparaître le déchet au niveau de la soute (arrière de l'avion)
+        """Génère un déchet qui tombe de l'arrière de l'avion."""
         trash_x = self.rect.right - 20 if self.direction == -1 else self.rect.left + 20
         trash_y = self.rect.bottom - 15
 
         random_file = random.choice(["tire.png", "bottle.png", "glassBottle.png", "trashBag.png", "cardboard.png"])
-
-        scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7,"bottle.png":2,"trashBag.png":3}
+        scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
         s = scales.get(random_file, 3)
 
         trash = Waste(trash_x, trash_y, random_file, scale=s, vel_x=self.speed * self.direction, vel_y=2)
         objects.append(trash)
 
     def draw(self, win, offset_x):
-        # Choix de l'image selon l'avancement de l'animation
+        """Affiche l'avion avec la bonne frame d'animation et direction."""
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(self.sprites)
         sprite = self.sprites[sprite_index]
 
-        # Si l'avion va vers la gauche (-1), on retourne l'image
         if self.direction == -1:
             sprite = pygame.transform.flip(sprite, True, False)
 
         win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
 
+
 def spawn_avion(objects, level):
+    """Fait apparaître un avion avec une direction et vitesse aléatoires."""
     direction = random.choice([-1, 1])
     spawn_x = -1500 if direction == 1 else 3500
 
-    # Vitesse de l'avion selon le niveau
-    if level == 0: speed = random.randint(2, 4)
-    elif level == 1: speed = random.randint(4, 7)
-    else: speed = random.randint(6, 9)
+    if level == 0:
+        speed = random.randint(2, 4)
+    elif level == 1:
+        speed = random.randint(4, 7)
+    else:
+        speed = random.randint(6, 9)
 
     avion = Avion(spawn_x, 0, direction, speed=speed, level=level)
     objects.append(avion)
 
+
 class Bridge(Object):
+    """Gère l'affichage et la collision du pont."""
+
     def __init__(self, x, y, width, bottom_img, top_img):
-        # On définit la hauteur totale basée sur le bottom_img pour la collision
         super().__init__(x, y, width, bottom_img.get_height(), "bridge")
         self.bottom_img = bottom_img
         self.top_img = top_img
-        # Le rect de collision sera calé sur le haut du bottomBridge
-        self.rect = pygame.Rect(x, y, width, 20) # 20px d'épaisseur pour marcher dessus
+        # Zone de collision (épaisseur de 20px pour marcher)
+        self.rect = pygame.Rect(x, y, width, 20)
 
     def draw(self, win, offset_x):
-        # On dessine le bas (le support)
         win.blit(self.bottom_img, (self.rect.x - offset_x, self.rect.y))
-        # On dessine le haut (la rambarde) juste au dessus
-        # On soustrait la hauteur de la rambarde pour qu'elle soit posée sur le pont
+        # Rambarde posée sur le pont (soustraction de la hauteur)
         win.blit(self.top_img, (self.rect.x - offset_x, self.rect.y - self.top_img.get_height() + 3))
 
+
 class ParallaxBackground:
+
     def __init__(self, win):
         self.window = win
         self.width = win.get_width()
-        # On définit le décalage vertical : -96 pour monter
         self.y_offset = -96
 
-        # Chargement des images
         self.layers = [
             {"img": pygame.image.load(join("assets", "Background", "sky.png")).convert_alpha(), "speed": 0.1},
             {"img": pygame.image.load(join("assets", "Background", "houses.png")).convert_alpha(), "speed": 0.4},
@@ -795,38 +727,30 @@ class ParallaxBackground:
         ]
 
     def draw(self, offset_x):
+        """Dessine les calques de fond en boucle infinie."""
         for layer in self.layers:
-            # On calcule le décalage horizontal selon la vitesse du calque
             rel_x = (offset_x * layer["speed"]) % self.width
-
-            # On dessine l'image principale avec le décalage Y de -96
             self.window.blit(layer["img"], (-rel_x, self.y_offset))
 
-            # On dessine la copie à côté avec le même décalage Y
             if rel_x > 0:
                 self.window.blit(layer["img"], (self.width - rel_x, self.y_offset))
             else:
                 self.window.blit(layer["img"], (-self.width - rel_x, self.y_offset))
 
+
 class Water(Object):
-    ANIMATION_DELAY = 10  # Environ 6 FPS (60 FPS / 10 = 6 images par seconde)
-    SURFACE_COLOR = (116, 163, 59)  # Couleur hexa #74a33b convertie en RGB
+    ANIMATION_DELAY = 10
+    SURFACE_COLOR = (116, 163, 59)
 
     def __init__(self, y, height, speed=1):
-        # On définit une largeur très grande pour couvrir le niveau
-        # Et la hauteur totale de la masse d'eau
         super().__init__(-5000, y, 15000, height, "water")
-
-        # Chargement de la feuille de sprite
-        path = join("assets", "Other", "water.png")  # Assure-toi du chemin/nom du fichier
+        path = join("assets", "Other", "water.png")
         sprite_sheet = pygame.image.load(path).convert_alpha()
 
-        # Découpage des 4 frames (200x50 chacune)
         self.sprites = []
         for i in range(4):
             surface = pygame.Surface((200, 50), pygame.SRCALPHA)
             surface.blit(sprite_sheet, (0, 0), pygame.Rect(0, i * 50, 200, 50))
-            # surface = pygame.transform.scale2x(surface) # Décommente pour agrandir l'écume
             self.sprites.append(surface)
 
         self.image = self.sprites[0]
@@ -834,32 +758,31 @@ class Water(Object):
         self.speed = speed
 
     def update(self):
-        # Gestion du cycle d'animation
+        """Met à jour l'animation de l'écume."""
         self.animation_count += 1
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(self.sprites)
         self.image = self.sprites[sprite_index]
 
     def draw(self, win, offset_x):
-        # --- ÉTAPE 1 : Le gros rectangle de couleur unie #74a33b ---
-        # Il remplit toute la zone de l'eau
+        """Dessine le corps de l'eau (rectangle) et la surface animée (sprites)."""
         pygame.draw.rect(
             win,
             self.SURFACE_COLOR,
             (self.rect.x - offset_x, self.rect.y + 50, self.rect.width, self.rect.height + 800)
         )
 
-        # --- ÉTAPE 2 : La ligne d'écume animée tout en haut ---
-        # On dessine l'image en boucle (tiling) UNIQUEMENT sur la première ligne
         sprite_w = self.image.get_width()
-
-        # On remplit horizontalement, mais y reste fixe à la surface (self.rect.y)
         for x in range(0, self.rect.width, sprite_w):
             win.blit(self.image, (self.rect.x + x - offset_x, self.rect.y))
 
     def up(self, dy):
+        """Fait monter le niveau de l'eau."""
         self.rect.y -= dy * self.speed
 
+
 class Platform(Object):
+    """Plateforme basique."""
+
     def __init__(self, x, y):
         width = 120
         height = 30
@@ -867,9 +790,12 @@ class Platform(Object):
 
         img = pygame.image.load(join("assets", "Terrain", "plateform.png")).convert_alpha()
         self.image = pygame.transform.scale(img, (width, height))
-
-        # IMPORTANT : collision fine (surface du dessus)
         self.rect = pygame.Rect(x, y, width, height)
+
+
+# =====================================================================
+# MENUS ET INTERFACES
+# =====================================================================
 
 def main_menu(window):
     clock = pygame.time.Clock()
@@ -880,77 +806,74 @@ def main_menu(window):
     grass_img = get_block(block_size, block_size, "dirtGrassBlock.png")
     dirt_img = get_block(block_size, block_size, "dirtBlock.png")
 
-    # --- BOUTON : Plus gros et décalé à gauche ---
-    # On le place à 1/3 de la largeur de l'écran
-    play_btn = Button(WIDTH // 3 +100, HEIGHT // 2, "bouttonJouer.png")
-    # Si tu veux le grossir via code (ex: scale=2), assure-t-on que la classe Button le gère
-    # Ici on part du principe que l'image 150x50 est affichée
+    # --- BOUTONS ---
+    # On centre les boutons horizontalement (WIDTH // 2)
+    # Le bouton Jouer est un peu plus haut, le bouton Quitter en dessous
+    play_btn = Button(WIDTH // 2 - 75, HEIGHT // 2 - 60, "bouttonJouer.png")
+    quit_btn = Button(WIDTH // 2 - 75, HEIGHT // 2 + 70, "bouttonQuitter.png")
 
-    # --- LE JOUEUR : On crée une instance juste pour le menu ---
-    # On le place à droite du bouton
-    menu_player = Player(WIDTH // 3 + 350, HEIGHT // 2 - 50, 60, 96)
-    menu_player.direction = "right"  # Il regarde vers la droite (ou le bouton)
+    # --- LE JOUEUR (Visuel) ---
+    menu_player = Player(WIDTH // 2 + 200, HEIGHT // 2 - 50, 60, 96)
+    menu_player.direction = "right"
 
     menu_scroll = 0
     run_menu = True
 
     while run_menu:
         clock.tick(FPS)
-        menu_scroll += 2  # Vitesse de défilement
+        menu_scroll += 2
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 exit()
 
-        # 1. Dessin du Parallax (Ciel, Maisons, Route)
+        # 1. Dessin du Parallax
         parallax_bg.draw(menu_scroll)
 
-        # 2. Dessin du SOL (2 lignes de blocs)
-        # On calcule le décalage pour que le sol boucle parfaitement
+        # 2. Dessin du SOL
         for i in range(-1, (WIDTH // block_size) + 2):
-            # On utilise la vitesse de la route (0.7 dans ton Parallax) pour que le sol soit raccord
             x_pos = (i * block_size) - ((menu_scroll * 0.7) % block_size)
             window.blit(grass_img, (x_pos, HEIGHT - block_size * 2))
             window.blit(dirt_img, (x_pos, HEIGHT - block_size))
 
-        # 3. Animation et Dessin du Joueur
-        menu_player.x_vel = 0  # On s'assure qu'il reste en "Idle"
+        # 3. Animation du Joueur
+        menu_player.x_vel = 0
         menu_player.update_sprite()
-        # On le dessine sans offset_x car il est fixe à l'écran dans le menu
         window.blit(menu_player.sprite, (menu_player.hitbox.x - menu_player.sprite_offset_x,
                                          menu_player.hitbox.y - menu_player.sprite_offset_y))
 
-        # 4. Dessin du Bouton
         if play_btn.draw(window):
             run_menu = False
 
+        if quit_btn.draw(window):
+            pygame.quit()
+            exit()
+
         pygame.display.update()
 
+
 def draw_pause_menu(window):
-    #Texte "PAUSE"
+    """Affiche l'overlay de pause."""
     font = pygame.font.SysFont("arial", 80)
     text = font.render("PAUSE", True, (255, 255, 255))
     window.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 3))
 
-    #instructions
     font_small = pygame.font.SysFont("arial", 40)
     text2 = font_small.render("Appuie sur Echap pour reprendre", True, (200, 200, 200))
     window.blit(text2, (WIDTH // 2 - text2.get_width() // 2, HEIGHT // 2))
 
-    # Dessin des boutons
-    """
-    resume_btn.draw(window)
-    quit_btn.draw(window)
-    """
+    # À décommenter une fois les boutons ajoutés
+    # resume_btn.draw(window)
+    # quit_btn.draw(window)
 
     pygame.display.update()
 
 
 def show_level_transition(window, level):
+    """Affiche l'écran de transition entre les niveaux et le tutoriel."""
     font_titre = pygame.font.SysFont('Arial', 80, bold=True)
     font_sous_titre = pygame.font.SysFont('Arial', 40)
-    # Police un peu plus petite pour les consignes
     font_instructions = pygame.font.SysFont('Arial', 30)
 
     instructions_tuto = []
@@ -958,7 +881,6 @@ def show_level_transition(window, level):
     if level == 0:
         titre = "Niveau 0"
         sous_titre = "Triez 6 déchets pour commencer l'aventure !"
-        # On définit les règles du tri ici
         instructions_tuto = [
             "Poubelle Verte : Verre",
             "Poubelle Jaune : Bouteilles plastiques & Cartons",
@@ -984,25 +906,21 @@ def show_level_transition(window, level):
     t1 = font_titre.render(titre, True, (255, 255, 255))
     t2 = font_sous_titre.render(sous_titre, True, (200, 255, 200))
 
-    # On a remonté un peu le titre et le sous-titre pour faire de la place
     window.blit(t1, t1.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 120)))
     window.blit(t2, t2.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 40)))
 
-    # On affiche chaque ligne d'instruction (seulement s'il y en a)
     for i, ligne in enumerate(instructions_tuto):
         texte = font_instructions.render(ligne, True, (200, 200, 255))
         window.blit(texte, texte.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 30 + (i * 35))))
 
     pygame.display.update()
 
-    # On met une pause de 4.5 secondes (au lieu de 3.5) au Tuto pour avoir le temps de lire
-    if level == 0:
-        pygame.time.delay(4500)
-    else:
-        pygame.time.delay(3500)  # Met le jeu en pause 3.5 secondes pour lire
+    # Pause plus longue pour le tutoriel afin de laisser le temps de lire
+    pygame.time.delay(4500 if level == 0 else 3500)
 
 
 def game_over_screen(window):
+    """Affiche l'écran de fin de partie avec le choix de rejouer."""
     clock = pygame.time.Clock()
     font_titre = pygame.font.SysFont('Arial', 100, bold=True)
     font_texte = pygame.font.SysFont('Arial', 40)
@@ -1025,56 +943,55 @@ def game_over_screen(window):
             if event.type == pygame.QUIT:
                 return False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    return True  # Rejouer
-                if event.key == pygame.K_ESCAPE:
-                    return False  # Quitter
+                if event.key == pygame.K_SPACE: return True
+                if event.key == pygame.K_ESCAPE: return False
 
 
+# =====================================================================
+# BOUCLE PRINCIPALE DU JEU
+# =====================================================================
 
 def main(window, start_level=0):
     clock = pygame.time.Clock()
-
     current_level = start_level
     total_recycled = 0
-    # Le boss final (3) demande maintenant 20 déchets
+
     level_goals = {0: 6, 1: 10, 2: 15, 3: 20}
-
-    # Temps alloué par niveau (en secondes) : Tuto=60s, N1=90s, N2=120s, Boss=180s
     level_times = {0: 60, 1: 90, 2: 120, 3: 180}
-
-    # On convertit le temps en frames (60 frames par seconde)
     frames_left = level_times.get(current_level, 60) * FPS
 
     show_level_transition(window, current_level)
 
     parallax_bg = ParallaxBackground(window)
-    offset_x = 0
-    scroll_area_width = 400  # Zone où la caméra commence à suivre le joueur
     block_size = 96
 
-    generated_until = block_size * 36  #utilisation gen aleatoire
-    segment_length = block_size * 8
-
+    # Initialisation des éléments du pont
     img_top = pygame.image.load(join("assets", "Terrain", "topBridge.png")).convert_alpha()
     img_bottom = pygame.image.load(join("assets", "Terrain", "bottomBridge.png")).convert_alpha()
-
-    # On scale pour que ça fasse exactement la largeur de 3 blocs (3 * 96 = 288)
-    # sans changer la hauteur pour respecter ton souhait
     bridge_width = 308
-
-    # Positionnement au niveau du trou (index 3)
     bridge_x = 3 * block_size - 10
-    bridge_y = HEIGHT - block_size * 2 # Aligné sur le haut du sol
-
+    bridge_y = HEIGHT - block_size * 2
     bridge = Bridge(bridge_x, bridge_y, bridge_width, img_bottom, img_top)
 
     player = Player(150, 100, 60, 96)
-    floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
-    bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size,"dirtBlock.png") for i in range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
-    left_wall = [Block(-960, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
-    left_left__wall = [Block(-1056, j * block_size, block_size,"dirtBlock.png") if j != 0 else Block(-1056, j * block_size, block_size,"dirtGrassBlock.png") for j in range(-5,9)]
-    left_left_left_wall = [Block(-1152, i * block_size, block_size,"dirtBlock.png") if i != 0 else Block(-1152, i * block_size, block_size,"dirtGrassBlock.png") for i in range(-5,9)]
+
+    # Création du terrain
+    floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
+             range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
+    bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
+                    range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
+    left_wall = [
+        Block(-960, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,
+                                                                                      "dirtGrassBlock.png") for i in
+        range(-5, 9)]
+    left_left__wall = [
+        Block(-1056, j * block_size, block_size, "dirtBlock.png") if j != 0 else Block(-1056, j * block_size,
+                                                                                       block_size, "dirtGrassBlock.png")
+        for j in range(-5, 9)]
+    left_left_left_wall = [
+        Block(-1152, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(-1152, i * block_size,
+                                                                                       block_size, "dirtGrassBlock.png")
+        for i in range(-5, 9)]
 
     objects = [
         bridge,
@@ -1089,41 +1006,32 @@ def main(window, start_level=0):
         TrashBin(-480, HEIGHT - 175 - 96, "black"),
 
         ShadowBlock(-180, 0, 80, HEIGHT),
-        Plot(-150, 436, 48, 72),
+        Plot(-150, 536, 48, 72),
 
-        # On garde 1 déchet pour la poubelle Verte (verre) et 1 pour la Jaune (carton)
         Waste(block_size * 10, HEIGHT - block_size * 4 - 75, "glassBottle.png", 1),
         Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "cardboard.png", 2.7),
-
     ]
 
     water = Water(HEIGHT - 100, 200, 0.3)
     objects.append(water)
 
+    start_x = 500
+    y = HEIGHT - 300
+    for i in range(6):
+        objects.append(Platform(start_x + i * 120, y))
+
+    # Paramètres de caméra
     offset_x = 0
     scroll_area_width = 200
     scroll = 0
-
     camera_shifted = False
     saved_offset_x = 0
     saved_scroll = 0
 
     cpt = 0
-
     paused = False
-    """
-    image a rajouter
-    resume_btn = Button(WIDTH // 2, HEIGHT // 2 - 50, "bouttonJouer.png")
-    quit_btn = Button(WIDTH // 2, HEIGHT // 2 + 50, "bouttonQuitter.png")
-    """
-
-    start_x = 500
-    y = HEIGHT - 300
-
-    for i in range(6):
-        objects.append(Platform(start_x + i * 120, y))
-
     run = True
+
     while run:
         clock.tick(FPS)
         cpt += 1
@@ -1132,35 +1040,22 @@ def main(window, start_level=0):
             if event.type == pygame.QUIT:
                 run = False
                 break
-
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
-
-            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     paused = not paused
 
         if paused:
-            #parametre a changer une fois boutton ajouter
             draw_pause_menu(window)
-
-            """
-            rajouter image boutton play et quitte
-            if resume_btn.draw(window):
-                paused = False
-
-            if quit_btn.draw(window):
-                run = False
-            """
-
             continue
 
+        # Mise à jour de la physique du joueur
         handle_move(player, objects, offset_x)
         player.loop(FPS)
         handle_vertical_collision(player, objects)
 
-        # Dictionnaire de correspondance : Fichier -> Couleur de poubelle
+        # Règle de tri des déchets
         WASTE_TYPES = {
             "glassBottle.png": "green",
             "cardboard.png": "yellow",
@@ -1169,39 +1064,41 @@ def main(window, start_level=0):
             "trashBag.png": "black"
         }
 
-        for obj in objects[:]:  # Utilise [:] pour copier la liste car on va supprimer des éléments
+        # Parcours et mise à jour des objets
+        for obj in objects[:]:
 
+            # --- GESTION DE L'EAU (DÉGÂTS) ---
             if isinstance(obj, Water):
                 obj.update()
-
-                # --- NOUVEAU : Dégâts de l'eau (1 demi-coeur toutes les 2s) ---
                 if player.hitbox.colliderect(obj.rect):
                     player.water_timer += 1
-
-                    if player.water_timer >= FPS * 2:  # Au bout de 2 secondes (120 frames)
-                        player.health -= 1  # -1 demi-coeur
-                        player.make_hit()  # Fait clignoter le perso en rouge
-                        player.water_timer = 0  # On remet à zéro pour les 2 prochaines secondes
+                    # 1 demi-coeur retiré toutes les 2 secondes (120 frames)
+                    if player.water_timer >= FPS * 2:
+                        player.health -= 1
+                        player.make_hit()
+                        player.water_timer = 0
                 else:
-                    # Si le joueur sort de l'eau, le chrono retombe à zéro
                     player.water_timer = 0
 
+            # --- GESTION DE L'AVION ---
             if isinstance(obj, Avion):
                 obj.update(objects)
-
+                # Destruction si l'avion sort de l'écran
                 if (obj.direction == 1 and obj.rect.left > 3500) or (obj.direction == -1 and obj.rect.right < -1500):
                     if obj in objects: objects.remove(obj)
                     continue
 
                 if obj.rect.colliderect(player.hitbox):
-                    player.health -= 1  # 1 SEUL DEGAT (= 1 demi-coeur)
+                    player.health -= 1
                     if obj in objects: objects.remove(obj)
 
+            # --- GESTION DES DÉCHETS (RECYCLAGE ET ERREURS) ---
             if isinstance(obj, Waste):
                 obj.update(objects)
 
+                # Dégât si le déchet tombe sur le joueur
                 if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
-                    player.health -= 1  # 1 SEUL DEGAT (= 1 demi-coeur)
+                    player.health -= 1
                     player.health = max(0, player.health)
                     if obj in objects: objects.remove(obj)
                     continue
@@ -1211,47 +1108,45 @@ def main(window, start_level=0):
                         if obj.rect.colliderect(other.hitbox):
                             correct_color = WASTE_TYPES.get(obj.filename)
                             if correct_color == other.color:
+                                # Bon tri
                                 objects.remove(obj)
-                                # --- NOUVEAU : On compte le recyclage ! ---
                                 total_recycled += 1
                                 if total_recycled >= level_goals.get(current_level, 999):
                                     current_level += 1
                                     total_recycled = 0
                                     show_level_transition(window, current_level)
                             else:
+                                # Mauvais tri : l'eau monte !
                                 water.up(80)
                                 objects.remove(obj)
                             break
 
-            # --- NOUVEAU : Limite de 2 avions actifs max ---
-            # On compte combien d'avions sont actuellement dans la liste des objets
-        avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-
-        # On ne fait spawn un avion que s'il y en a moins de 2
+        # --- SPAWN DES AVIONS (MAX 2 ACTIFS) ---
         avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
         if avions_actifs < 2:
             spawn_chance = 150 if current_level == 0 else (100 if current_level == 1 else 60)
             if random.randint(1, spawn_chance) == 1 and cpt % 5 == 0:
                 spawn_avion(objects, current_level)
 
-        # --- Vérification de la mort ---
+        # --- CONDITION DE DÉFAITE ---
         if player.health <= 0:
             rejouer = game_over_screen(window)
             return rejouer
 
+        # --- GESTION DE LA CAMÉRA ---
+        # Shift spécial si le joueur recule loin à gauche
         if player.hitbox.x <= -95 and not camera_shifted:
             saved_offset_x = offset_x
             saved_scroll = scroll
             offset_x -= 800
             scroll -= 800
             camera_shifted = True
-
         elif player.hitbox.x > -95 and camera_shifted:
             offset_x = saved_offset_x
             scroll = saved_scroll
             camera_shifted = False
 
-            # --- AJOUT ETAPE 4 : CAMÉRA NORMALE ---
+        # Caméra normale suivant le joueur
         if not camera_shifted:
             if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                     (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
@@ -1261,7 +1156,7 @@ def main(window, start_level=0):
             if abs(scroll) > WIDTH:
                 scroll = 0
 
-        # --- AJOUT ETAPE 5 : DESSIN ---
+        # Dessin global
         draw(window, parallax_bg, player, objects, offset_x)
 
     pygame.quit()
@@ -1273,9 +1168,9 @@ if __name__ == "__main__":
     niveau_depart = 0  # Lance le Tuto la première fois
 
     while jeu_en_cours:
-        main_menu(window)
+        main_menu(window)  # Assure-toi que "window" est définie en amont dans ton code global
 
-        # Le jeu renvoie True si le joueur veut rejouer après un Game Over
+        # Le jeu renvoie True si le joueur choisit "Espace" au game over
         vouloir_rejouer = main(window, start_level=niveau_depart)
 
         if vouloir_rejouer:
