@@ -718,7 +718,7 @@ class ParallaxBackground:
     def __init__(self, win):
         self.window = win
         self.width = win.get_width()
-        self.y_offset = -96
+        self.y_offset = -70
 
         self.layers = [
             {"img": pygame.image.load(join("assets", "Background", "sky.png")).convert_alpha(), "speed": 0.1},
@@ -778,6 +778,8 @@ class Water(Object):
     def up(self, dy):
         """Fait monter le niveau de l'eau."""
         self.rect.y -= dy * self.speed
+        if self.rect.y > 110:
+            self.speed = 0.4
 
 
 class Platform(Object):
@@ -871,7 +873,7 @@ def draw_pause_menu(window):
 
 
 def show_level_transition(window, level):
-    """Affiche l'écran de transition entre les niveaux et le tutoriel."""
+    """Affiche l'écran de transition et attend l'appui sur Espace."""
     font_titre = pygame.font.SysFont('Arial', 80, bold=True)
     font_sous_titre = pygame.font.SysFont('Arial', 40)
     font_instructions = pygame.font.SysFont('Arial', 30)
@@ -913,23 +915,44 @@ def show_level_transition(window, level):
         texte = font_instructions.render(ligne, True, (200, 200, 255))
         window.blit(texte, texte.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 30 + (i * 35))))
 
+    # Indicateur pour lancer le jeu
+    font_espace = pygame.font.SysFont('Arial', 35, italic=True)
+    t3 = font_espace.render("Appuyez sur ESPACE pour commencer...", True, (255, 255, 150))
+    window.blit(t3, t3.get_rect(center=(WIDTH // 2, HEIGHT - 100)))
+
     pygame.display.update()
 
-    # Pause plus longue pour le tutoriel afin de laisser le temps de lire
-    pygame.time.delay(4500 if level == 0 else 3500)
+    # Boucle d'attente
+    attente = True
+    while attente:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    attente = False
 
 
-def game_over_screen(window):
-    """Affiche l'écran de fin de partie avec le choix de rejouer."""
+def game_over_screen(window, message="VOUS ÊTES MORT"):
+    """Affiche l'écran de fin de partie avec le choix de rejouer et la cause de la mort."""
     clock = pygame.time.Clock()
-    font_titre = pygame.font.SysFont('Arial', 100, bold=True)
+
+    # On adapte la police et la couleur selon si c'est un game over classique ou par l'eau
+    if message == "VOUS ÊTES MORT":
+        font_titre = pygame.font.SysFont('Arial', 100, bold=True)
+        couleur_titre = (255, 50, 50)
+    else:
+        font_titre = pygame.font.SysFont('Arial', 70, bold=True)  # Plus petit car la phrase est longue
+        couleur_titre = (100, 200, 255)  # Couleur bleutée pour l'eau
+
     font_texte = pygame.font.SysFont('Arial', 40)
 
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 220))
     window.blit(overlay, (0, 0))
 
-    titre = font_titre.render("VOUS ÊTES MORT", True, (255, 50, 50))
+    titre = font_titre.render(message, True, couleur_titre)
     window.blit(titre, titre.get_rect(center=(WIDTH // 2, HEIGHT // 3)))
 
     instructions = font_texte.render("ESPACE pour rejouer  |  ECHAP pour quitter", True, (255, 255, 255))
@@ -947,9 +970,6 @@ def game_over_screen(window):
                 if event.key == pygame.K_ESCAPE: return False
 
 
-# =====================================================================
-# BOUCLE PRINCIPALE DU JEU
-# =====================================================================
 
 def main(window, start_level=0):
     clock = pygame.time.Clock()
@@ -969,17 +989,37 @@ def main(window, start_level=0):
     img_top = pygame.image.load(join("assets", "Terrain", "topBridge.png")).convert_alpha()
     img_bottom = pygame.image.load(join("assets", "Terrain", "bottomBridge.png")).convert_alpha()
     bridge_width = 308
-    bridge_x = 3 * block_size - 10
-    bridge_y = HEIGHT - block_size * 2
-    bridge = Bridge(bridge_x, bridge_y, bridge_width, img_bottom, img_top)
+    bridge_x1 = 3 * block_size - 10
+    bridge_y1 = HEIGHT - block_size * 2
+    bridge_x2 = 16 * block_size - 10
+    bridge_y2 = HEIGHT - block_size * 4
+    bridge1 = Bridge(bridge_x1, bridge_y1, bridge_width, img_bottom, img_top)
+    bridge2 = Bridge(bridge_x2, bridge_y2, bridge_width, img_bottom, img_top)
 
     player = Player(150, 100, 60, 96)
 
     # Création du terrain
     floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
-             range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
+             range(-10, 23) if i not in [3,4,5,9,10,11,12,13,14,15,16,17,18,19,20]]
+    floor += [Block(i * block_size, HEIGHT - block_size * 4, block_size, "dirtGrassBlock.png") for i in
+             range(14,31) if i not in [16,17,18,21,22,23,24]]
+    floor += [Block(i * block_size, HEIGHT -block_size, block_size, "dirtGrassBlock.png") for i in
+              range(9, 25) if i not in [14,15,16,17,18,19,20,21,22]]
+    floor += [Block(6 * block_size, HEIGHT - block_size*6, block_size, "dirtGrassBlock.png")]
+
     bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
-                    range(-10, WIDTH * 10 // block_size) if i not in [3, 4, 5]]
+                    range(-10, 31) if i not in [3,4,5,9,10,11,12,13,16,17,18,23,24]]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtBlock.png") for i in
+                    range(14, 31) if i not in [16,17,18,21,22,23,24]]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 3, block_size, "dirtBlock.png") for i in
+                     range(14, 31) if i not in [16, 17, 18, 21, 22,23,24]]
+    bottom_floor += [Block(6 * block_size, HEIGHT - block_size * 5, block_size, "dirtBlock.png")]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 7, block_size, "dirtBlock.png") for i in
+                     range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 8, block_size, "dirtBlock.png") for i in
+                     range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 9, block_size, "dirtBlock.png") for i in
+                     range(14, 16)]
     left_wall = [
         Block(-960, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,
                                                                                       "dirtGrassBlock.png") for i in
@@ -993,8 +1033,18 @@ def main(window, start_level=0):
                                                                                        block_size, "dirtGrassBlock.png")
         for i in range(-5, 9)]
 
+    plateform1 = [Platform(100 + i * 120, 150) for i in range(2)]
+
+    plateform2 = [Platform(96 * i - 60, 96 * 4 + 2) for i in range(7, 10)]
+
+    plateform3 = [Platform(96 * i - 60, 96 * 2 + 2) for i in range(19, 23)]
+
     objects = [
-        bridge,
+        *plateform1,
+        *plateform2,
+        *plateform3,
+        bridge1,
+        bridge2,
         *bottom_floor,
         *floor,
         *left_wall,
@@ -1012,13 +1062,9 @@ def main(window, start_level=0):
         Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "cardboard.png", 2.7),
     ]
 
-    water = Water(HEIGHT - 100, 200, 0.3)
+    water = Water(HEIGHT - 74, 200, 0.1)
     objects.append(water)
 
-    start_x = 500
-    y = HEIGHT - 300
-    for i in range(6):
-        objects.append(Platform(start_x + i * 120, y))
 
     # Paramètres de caméra
     offset_x = 0
@@ -1027,6 +1073,7 @@ def main(window, start_level=0):
     camera_shifted = False
     saved_offset_x = 0
     saved_scroll = 0
+    death_message = "VOUS ÊTES MORT"
 
     cpt = 0
     paused = False
@@ -1071,14 +1118,8 @@ def main(window, start_level=0):
             if isinstance(obj, Water):
                 obj.update()
                 if player.hitbox.colliderect(obj.rect):
-                    player.water_timer += 1
-                    # 1 demi-coeur retiré toutes les 2 secondes (120 frames)
-                    if player.water_timer >= FPS * 2:
-                        player.health -= 1
-                        player.make_hit()
-                        player.water_timer = 0
-                else:
-                    player.water_timer = 0
+                    player.health = 0
+                    death_message = "Vous avez noyé votre planète..."
 
             # --- GESTION DE L'AVION ---
             if isinstance(obj, Avion):
@@ -1130,7 +1171,7 @@ def main(window, start_level=0):
 
         # --- CONDITION DE DÉFAITE ---
         if player.health <= 0:
-            rejouer = game_over_screen(window)
+            rejouer = game_over_screen(window, message=death_message)
             return rejouer
 
         # --- GESTION DE LA CAMÉRA ---
