@@ -701,10 +701,13 @@ class Avion(Object):
         self.animation_count += 1
         self.drop_timer -= 1
 
-        # Zone de largage autorisée
+        # Zone de largage autorisée (On vérifie si l'avion n'est PAS entre 1310 et 1550)
         if self.drop_timer <= 0:
-            if -140 <= self.rect.x <= 2800:
-                self.drop_waste(objects)
+            avion_x = self.rect.x
+            # On n'autorise le drop que si on est en dehors de la zone interdite
+            if not (1310 <= avion_x <= 1550):
+                if -140 <= avion_x <= 2800:
+                    self.drop_waste(objects)
             self.reset_drop_timer()
 
     def drop_waste(self, objects):
@@ -1077,23 +1080,29 @@ def main(window, start_level=0):
     floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
              range(-10, 23) if i not in [3,4,5,9,10,11,12,13,14,15,16,17,18,19,20]]
     floor += [Block(i * block_size, HEIGHT - block_size * 4, block_size, "dirtGrassBlock.png") for i in
-             range(14,31) if i not in [16,17,18,21,22,23,24]]
+             range(14,27) if i not in [16,17,18,21,22,23,24]]
     floor += [Block(i * block_size, HEIGHT -block_size, block_size, "dirtGrassBlock.png") for i in
               range(9, 25) if i not in [14,15,16,17,18,19,20,21,22]]
     floor += [Block(6 * block_size, HEIGHT - block_size*6, block_size, "dirtGrassBlock.png")]
 
     bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
-                    range(-10, 31) if i not in [3,4,5,9,10,11,12,13,16,17,18,23,24]]
+                    range(-10, 27) if i not in [3,4,5,9,10,11,12,13,16,17,18,23,24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtBlock.png") for i in
-                    range(14, 31) if i not in [16,17,18,21,22,23,24]]
+                    range(14, 27) if i not in [16,17,18,21,22,23,24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 3, block_size, "dirtBlock.png") for i in
-                     range(14, 31) if i not in [16, 17, 18, 21, 22,23,24]]
+                     range(14, 27) if i not in [16, 17, 18, 21, 22,23,24]]
     bottom_floor += [Block(6 * block_size, HEIGHT - block_size * 5, block_size, "dirtBlock.png")]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 7, block_size, "dirtBlock.png") for i in
                      range(14, 16)]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 8, block_size, "dirtBlock.png") for i in
                      range(14, 16)]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 9, block_size, "dirtBlock.png") for i in
+                     range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 10, block_size, "dirtBlock.png") for i in
+                     range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 11, block_size, "dirtBlock.png") for i in
+                     range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 12, block_size, "dirtBlock.png") for i in
                      range(14, 16)]
     left_wall = [
         Block(-960, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,
@@ -1115,18 +1124,18 @@ def main(window, start_level=0):
     plateform3 = [Platform(96 * i - 60, 96 * 2 + 2) for i in range(19, 23)]
 
     right_wall = [
-        Block(31 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-        else Block(31 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+        Block(27 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+        else Block(27 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
         for i in range(-5, 9)
     ]
     right_right_wall = [
-        Block(32 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-        else Block(32 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+        Block(28 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+        else Block(28 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
         for i in range(-5, 9)
     ]
     right_right_right_wall = [
-        Block(33 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-        else Block(33 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+        Block(29 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+        else Block(29 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
         for i in range(-5, 9)
     ]
 
@@ -1156,7 +1165,7 @@ def main(window, start_level=0):
         Waste(block_size * 7, HEIGHT - block_size * 6 - 75, "cardboard.png", 2.7),
         Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "bottle.png", 2),
         Waste(block_size * 15, HEIGHT - block_size * 2 - 75, "trashBag.png", 3),
-        Waste(block_size * 20, HEIGHT - block_size * 3 - 75, "tire.png", 3),
+        Waste(block_size * 20, 0, "tire.png", 3),
         Waste(block_size * 25, HEIGHT - block_size * 2 - 75, "glassBottle.png", 1),
     ]
 
@@ -1372,7 +1381,7 @@ if __name__ == "__main__":
         main_menu(window)
 
         # On lance toujours au niveau 0 (Tuto)
-        vouloir_rejouer = main(window, start_level=2)
+        vouloir_rejouer = main(window, start_level=0)
 
         # Si le joueur ne veut pas rejouer (il a fait Echap), on quitte
         if not vouloir_rejouer:
