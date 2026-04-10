@@ -403,9 +403,25 @@ class Waste(Object):
                     self.y_vel = 0
                     break
 
-    def update(self, objects):
+    def update(self, objects, water=None):
         if not self.on_ground:
             self.y_vel += self.GRAVITY
+
+        # --- GESTION DE LA FLOTTAISON ---
+        if water and self.rect.bottom > water.rect.y:
+            # Résistance de l'eau (ralentit la chute et les rebonds)
+            self.x_vel *= 0.95
+            self.y_vel *= 0.90
+
+            # On calcule la ligne de flottaison (à 70% de la hauteur de l'objet)
+            # + un petit mouvement de vague avec math.sin !
+            vague = math.sin(pygame.time.get_ticks() / 200.0) * 5
+            ligne_flottaison = water.rect.y + (self.rect.height * 0.7) + vague
+
+            # Si le bas de l'objet dépasse cette ligne, on le pousse vers le haut
+            if self.rect.bottom > ligne_flottaison:
+                self.y_vel -= 1.5
+                # ---------------------------------
 
         self.x_vel *= self.FRICTION
 
@@ -413,15 +429,14 @@ class Waste(Object):
         self.rect.x = int(self.pos_x)
 
         for obj in objects:
-            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
-
+            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj,
+                                                                                Platform)) and self.rect.colliderect(
+                    obj.rect):
                 if self.x_vel > 0:
                     self.rect.right = obj.rect.left
                 elif self.x_vel < 0:
                     self.rect.left = obj.rect.right
-
                 self.pos_x = self.rect.x
-
                 self.x_vel *= -self.BOUNCE_DAMPING
 
         self.pos_y += self.y_vel
@@ -430,20 +445,18 @@ class Waste(Object):
         self.on_ground = False
 
         for obj in objects:
-            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
-
+            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj,
+                                                                                Platform)) and self.rect.colliderect(
+                    obj.rect):
                 if self.y_vel > 0:
                     self.rect.bottom = obj.rect.top
                     self.pos_y = self.rect.y
-
                     self.y_vel *= -self.BOUNCE_DAMPING
                     self.x_vel *= 0.8
-
                     if abs(self.y_vel) < self.STOP_THRESHOLD:
                         self.y_vel = 0
                         self.x_vel = 0
                         self.on_ground = True
-
                 elif self.y_vel < 0:
                     self.rect.top = obj.rect.bottom
                     self.pos_y = self.rect.y
@@ -1192,6 +1205,13 @@ def main(window, start_level=0):
 
         handle_move(player, objects, offset_x)
         player.loop(FPS)
+
+        # --- VÉRIFICATION MORT PAR L'EAU (STRICTE) ---
+        if player.hitbox.colliderect(water.rect):
+            player.health = 0
+            player.y_vel = 0  # Le joueur arrête de tomber, il flotte (mort)
+            death_message = "L'océan a repris ses droits..."
+
         handle_vertical_collision(player, objects)
 
         # Règle de tri des déchets
@@ -1230,12 +1250,8 @@ def main(window, start_level=0):
 
             # --- GESTION DES DÉCHETS (RECYCLAGE ET ERREURS) ---
             if isinstance(obj, Waste):
-                obj.update(objects)
-
-                # Le déchet disparaît s'il touche l'eau (SAUF pendant le tuto)
-                if obj.rect.colliderect(water.rect) and current_level > 0:
-                    if obj in objects: objects.remove(obj)
-                    continue
+                # On ajoute 'water' pour que la physique d'eau fonctionne
+                obj.update(objects, water=water)
 
                 # Dégât si le déchet tombe sur le joueur (SAUF pendant le tuto)
                 if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
