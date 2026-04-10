@@ -495,13 +495,13 @@ def get_background(name):
 
     return image, width, nb_tiles
 
-def draw(window, bg_parallax, player, objects, offset_x):
+
+def draw(window, bg_parallax, player, objects, offset_x, frames_left):
     bg_parallax.draw(offset_x)
 
     for obj in objects:
         if isinstance(obj, Water):
             obj.draw(window, offset_x)
-
 
     for obj in objects:
         if isinstance(obj, Water):
@@ -516,6 +516,14 @@ def draw(window, bg_parallax, player, objects, offset_x):
     player.draw_health_bar(window, offset_x)
     player.draw_trajectory(window, offset_x)
     player.draw_inventory(window)
+
+    font_timer = pygame.font.SysFont("arial", 40, bold=True)
+    secondes_restantes = max(0, frames_left // FPS)
+
+    couleur = (255, 50, 50) if secondes_restantes <= 15 else (255, 255, 255)
+    texte_timer = font_timer.render(f"Temps : {secondes_restantes}s", True, couleur)
+
+    window.blit(texte_timer, (WIDTH // 2 - texte_timer.get_width() // 2, 20))
 
     pygame.display.update()
 
@@ -586,16 +594,15 @@ def handle_move(player, objects, offset_x):
             v_x = max(min(v_x, MAX_SPEED), -MAX_SPEED)
             v_y = max(min(v_y, MAX_SPEED), -MAX_SPEED)
 
-            if m_x > player_screen_x:
-                spawn_x = player.hitbox.right + 10
-            else:
-                spawn_x = player.hitbox.left - 60
-            spawn_y = player.hitbox.top + 10
+            # --- CORRECTION BUG 2 : On fait spawn le déchet au-dessus de la tête ---
+            # Ça évite qu'il apparaisse "à l'intérieur" d'un mur si tu es collé à lui
+            spawn_x = player.hitbox.centerx - 15
+            spawn_y = player.hitbox.top - 40
 
             if len(player.inventory) > 0:
-                last_item_file,scale = player.inventory.pop()
+                last_item_file, scale = player.inventory.pop()
 
-                launched_item = Waste(spawn_x, spawn_y, last_item_file, scale,vel_x=v_x, vel_y=v_y)
+                launched_item = Waste(spawn_x, spawn_y, last_item_file, scale, vel_x=v_x, vel_y=v_y)
                 objects.append(launched_item)
 
                 player.trash_collected -= 1
@@ -659,9 +666,15 @@ class Avion(Object):
             self.reset_drop_timer()
 
     def drop_waste(self, objects):
-        """Génère un déchet qui tombe de l'arrière de l'avion."""
+
         trash_x = self.rect.right - 20 if self.direction == -1 else self.rect.left + 20
         trash_y = self.rect.bottom - 15
+
+        test_rect = pygame.Rect(trash_x, trash_y, 30, 30)
+        for obj in objects:
+
+            if isinstance(obj, (Block, Bridge, Platform)) and test_rect.colliderect(obj.rect):
+                return
 
         random_file = random.choice(["tire.png", "bottle.png", "glassBottle.png", "trashBag.png", "cardboard.png"])
         scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
@@ -680,9 +693,8 @@ class Avion(Object):
 
         win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
 
-
 def spawn_avion(objects, level):
-    """Fait apparaître un avion avec une direction et vitesse aléatoires."""
+
     direction = random.choice([-1, 1])
     spawn_x = -1500 if direction == 1 else 3500
 
@@ -977,7 +989,8 @@ def main(window, start_level=0):
     total_recycled = 0
 
     level_goals = {0: 6, 1: 10, 2: 15, 3: 20}
-    level_times = {0: 60, 1: 90, 2: 120, 3: 180}
+
+    level_times = {0: 150, 1: 90, 2: 100, 3: 120}
     frames_left = level_times.get(current_level, 60) * FPS
 
     show_level_transition(window, current_level)
@@ -996,9 +1009,8 @@ def main(window, start_level=0):
     bridge1 = Bridge(bridge_x1, bridge_y1, bridge_width, img_bottom, img_top)
     bridge2 = Bridge(bridge_x2, bridge_y2, bridge_width, img_bottom, img_top)
 
-    player = Player(150, 100, 60, 96)
+    player = Player(400, 520, 60, 96)
 
-    # Création du terrain
     floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
              range(-10, 23) if i not in [3,4,5,9,10,11,12,13,14,15,16,17,18,19,20]]
     floor += [Block(i * block_size, HEIGHT - block_size * 4, block_size, "dirtGrassBlock.png") for i in
@@ -1097,7 +1109,11 @@ def main(window, start_level=0):
             draw_pause_menu(window)
             continue
 
-        # Mise à jour de la physique du joueur
+        frames_left -= 1
+        if frames_left <= 0:
+            player.health = 0
+            death_message = "Temps écoulé !"
+
         handle_move(player, objects, offset_x)
         player.loop(FPS)
         handle_vertical_collision(player, objects)
@@ -1117,9 +1133,16 @@ def main(window, start_level=0):
             # --- GESTION DE L'EAU (DÉGÂTS) ---
             if isinstance(obj, Water):
                 obj.update()
+                # On répare la noyade : 1 demi-cœur toutes les 2 secondes (120 frames)
                 if player.hitbox.colliderect(obj.rect):
-                    player.health = 0
-                    death_message = "Vous avez noyé votre planète..."
+                    player.water_timer += 1
+                    if player.water_timer >= FPS * 2:
+                        if not player.hit:  # On vérifie que le joueur n'est pas déjà en train de clignoter
+                            player.health -= 1
+                            player.make_hit()
+                        player.water_timer = 0
+                else:
+                    player.water_timer = 0
 
             # --- GESTION DE L'AVION ---
             if isinstance(obj, Avion):
@@ -1130,17 +1153,26 @@ def main(window, start_level=0):
                     continue
 
                 if obj.rect.colliderect(player.hitbox):
-                    player.health -= 1
-                    if obj in objects: objects.remove(obj)
+                    # CORRECTION BUG 1 : L'avion ne disparaît plus et fait très mal (1 cœur plein = 2 PV)
+                    if not player.hit:
+                        player.health -= 2
+                        player.make_hit()
 
             # --- GESTION DES DÉCHETS (RECYCLAGE ET ERREURS) ---
             if isinstance(obj, Waste):
                 obj.update(objects)
 
+                # CORRECTION BUG 3 : Le déchet disparaît s'il touche l'eau
+                if obj.rect.colliderect(water.rect):
+                    if obj in objects: objects.remove(obj)
+                    continue
+
                 # Dégât si le déchet tombe sur le joueur
                 if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
-                    player.health -= 1
-                    player.health = max(0, player.health)
+                    # On le fait clignoter et on lui retire 1 demi-cœur
+                    if not player.hit:
+                        player.health -= 1
+                        player.make_hit()
                     if obj in objects: objects.remove(obj)
                     continue
 
@@ -1155,14 +1187,26 @@ def main(window, start_level=0):
                                 if total_recycled >= level_goals.get(current_level, 999):
                                     current_level += 1
                                     total_recycled = 0
+                                    frames_left = level_times.get(current_level, 60) * FPS
                                     show_level_transition(window, current_level)
+
+                                    player.hitbox.x = 400
+                                    player.hitbox.y = 520
+                                    player.x_vel = 0
+                                    player.y_vel = 0
+
+                                    player.inventory.clear()
+                                    player.trash_collected = 0
+
+                                    for o in objects[:]:
+                                        if isinstance(o, Waste):
+                                            objects.remove(o)
                             else:
-                                # Mauvais tri : l'eau monte !
+
                                 water.up(80)
                                 objects.remove(obj)
                             break
 
-        # --- SPAWN DES AVIONS (MAX 2 ACTIFS) ---
         avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
         if avions_actifs < 2:
             spawn_chance = 150 if current_level == 0 else (100 if current_level == 1 else 60)
@@ -1198,7 +1242,7 @@ def main(window, start_level=0):
                 scroll = 0
 
         # Dessin global
-        draw(window, parallax_bg, player, objects, offset_x)
+        draw(window, parallax_bg, player, objects, offset_x, frames_left)
 
     pygame.quit()
     quit()
