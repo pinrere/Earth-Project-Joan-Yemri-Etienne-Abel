@@ -496,7 +496,7 @@ def get_background(name):
     return image, width, nb_tiles
 
 
-def draw(window, bg_parallax, player, objects, offset_x, frames_left):
+def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_timer, throw_harder_timer, total_recycled, level_goal):
     bg_parallax.draw(offset_x)
 
     for obj in objects:
@@ -517,13 +517,39 @@ def draw(window, bg_parallax, player, objects, offset_x, frames_left):
     player.draw_trajectory(window, offset_x)
     player.draw_inventory(window)
 
+    # --- AFFICHAGE DU TIMER ---
     font_timer = pygame.font.SysFont("arial", 40, bold=True)
     secondes_restantes = max(0, frames_left // FPS)
-
     couleur = (255, 50, 50) if secondes_restantes <= 15 else (255, 255, 255)
     texte_timer = font_timer.render(f"Temps : {secondes_restantes}s", True, couleur)
-
     window.blit(texte_timer, (WIDTH // 2 - texte_timer.get_width() // 2, 20))
+
+    # --- AFFICHAGE DU COMPTEUR DE DÉCHETS ---
+    font_counter = pygame.font.SysFont("arial", 35, bold=True)
+    texte_counter = font_counter.render(f"Déchets : {total_recycled} / {level_goal}", True, (200, 255, 200)) # Une petite couleur verdâtre
+    window.blit(texte_counter, (WIDTH // 2 - texte_counter.get_width() // 2, 70)) # Placé juste en dessous du timer (y=70)
+
+    # --- MESSAGE : Mauvaise poubelle ---
+    if wrong_bin_timer > 0:
+        font_alerte = pygame.font.SysFont("arial", 60, bold=True)
+        texte_alerte = font_alerte.render("Mauvaise poubelle attention !", True, (255, 50, 50))
+        bg_alerte = pygame.Surface((texte_alerte.get_width() + 40, texte_alerte.get_height() + 20), pygame.SRCALPHA)
+        bg_alerte.fill((0, 0, 0, 180))
+        x_pos = WIDTH // 2 - texte_alerte.get_width() // 2
+        y_pos = HEIGHT // 3
+        window.blit(bg_alerte, (x_pos - 20, y_pos - 10))
+        window.blit(texte_alerte, (x_pos, y_pos))
+
+    # --- MESSAGE : Tire plus fort ! ---
+    if throw_harder_timer > 0:
+        font_alerte = pygame.font.SysFont("arial", 60, bold=True)
+        texte_alerte = font_alerte.render("Tire plus fort !", True, (255, 150, 50))
+        bg_alerte = pygame.Surface((texte_alerte.get_width() + 40, texte_alerte.get_height() + 20), pygame.SRCALPHA)
+        bg_alerte.fill((0, 0, 0, 180))
+        x_pos = WIDTH // 2 - texte_alerte.get_width() // 2
+        y_pos = HEIGHT // 3 + 80
+        window.blit(bg_alerte, (x_pos - 20, y_pos - 10))
+        window.blit(texte_alerte, (x_pos, y_pos))
 
     pygame.display.update()
 
@@ -642,12 +668,15 @@ class Avion(Object):
 
     def reset_drop_timer(self):
         """Définit le temps avant le prochain largage selon le niveau."""
-        if self.level == 0:
-            self.drop_timer = random.randint(150, 220)
-        elif self.level == 1:
-            self.drop_timer = random.randint(100, 160)
+        # Un timer aléatoire permet une bonne répartition sur toute la map
+        if self.level == 1:
+            self.drop_timer = random.randint(120, 200) # Lent
+        elif self.level == 2:
+            self.drop_timer = random.randint(50, 90)   # Rapide
+        elif self.level >= 3:
+            self.drop_timer = random.randint(15, 45)   # Mitraillette de déchets
         else:
-            self.drop_timer = random.randint(60, 110)
+            self.drop_timer = 9999
 
     def move(self):
         """Déplace l'avion horizontalement."""
@@ -661,22 +690,31 @@ class Avion(Object):
 
         # Zone de largage autorisée
         if self.drop_timer <= 0:
-            if -140 <= self.rect.x <= 3000:
+            if -140 <= self.rect.x <= 2800:
                 self.drop_waste(objects)
             self.reset_drop_timer()
 
     def drop_waste(self, objects):
+        # --- LIMITE MAX DE DÉCHETS PAR NIVEAU ---
+        max_wastes_per_level = {1: 5, 2: 25, 3: 125}
+        max_w = max_wastes_per_level.get(self.level, 0)
+
+        # On compte combien de déchets sont actuellement sur la map
+        current_waste = sum(1 for o in objects if isinstance(o, Waste) and not o.collected)
+
+        # Si on a atteint la limite, on ne lâche rien
+        if current_waste >= max_w:
+            return
 
         trash_x = self.rect.right - 20 if self.direction == -1 else self.rect.left + 20
         trash_y = self.rect.bottom - 15
 
         test_rect = pygame.Rect(trash_x, trash_y, 30, 30)
         for obj in objects:
-
             if isinstance(obj, (Block, Bridge, Platform)) and test_rect.colliderect(obj.rect):
                 return
 
-        random_file = random.choice(["tire.png", "bottle.png", "glassBottle.png", "trashBag.png", "cardboard.png"])
+        random_file = random.choice(["tire.png", "glassBottle.png", "cardboard.png", "bottle.png", "trashBag.png"])
         scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
         s = scales.get(random_file, 3)
 
@@ -694,18 +732,23 @@ class Avion(Object):
         win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
 
 def spawn_avion(objects, level):
-
-    direction = random.choice([-1, 1])
+    direction = random.choice([1,-1])
     spawn_x = -1500 if direction == 1 else 3500
 
+    # Vitesse grandement augmentée pour parcourir toute la map et bien répartir
     if level == 0:
         speed = random.randint(2, 4)
     elif level == 1:
         speed = random.randint(4, 7)
+    elif level == 2:
+        speed = random.randint(7, 12)
     else:
-        speed = random.randint(6, 9)
+        speed = random.randint(10, 16)
 
-    avion = Avion(spawn_x, 0, direction, speed=speed, level=level)
+    # On fait varier la hauteur Y (entre 0 et 150) pour que les avions ne se superposent pas
+    spawn_y = random.randint(0, 150)
+
+    avion = Avion(spawn_x, spawn_y, direction, speed=speed, level=level)
     objects.append(avion)
 
 
@@ -765,15 +808,16 @@ class Water(Object):
             surface.blit(sprite_sheet, (0, 0), pygame.Rect(0, i * 50, 200, 50))
             self.sprites.append(surface)
 
-        self.image = self.sprites[0]
+        self.image = self.sprites[0] # <--- CORRECTION : On met le pour prendre la 1ère frame
         self.animation_count = 0
         self.speed = speed
+        self.mistakes = 0
 
     def update(self):
         """Met à jour l'animation de l'écume."""
         self.animation_count += 1
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(self.sprites)
-        self.image = self.sprites[sprite_index]
+        self.image = self.sprites[sprite_index] # <--- CORRECTION : On met le pour animer
 
     def draw(self, win, offset_x):
         """Dessine le corps de l'eau (rectangle) et la surface animée (sprites)."""
@@ -787,11 +831,17 @@ class Water(Object):
         for x in range(0, self.rect.width, sprite_w):
             win.blit(self.image, (self.rect.x + x - offset_x, self.rect.y))
 
-    def up(self, dy):
-        """Fait monter le niveau de l'eau."""
-        self.rect.y -= dy * self.speed
-        if self.rect.y > 110:
-            self.speed = 0.4
+    def up(self):
+        """Fait monter le niveau de l'eau de façon non-linéaire."""
+        self.mistakes += 1
+
+        # 3 premières erreurs : montée lente (environ 30 pixels par erreur)
+        if self.mistakes <= 3:
+            self.rect.y -= 5
+
+        # Erreurs suivantes : montée rapide (environ 65 pixels par erreur)
+        else:
+            self.rect.y -= 30
 
 
 class Platform(Object):
@@ -1051,6 +1101,22 @@ def main(window, start_level=0):
 
     plateform3 = [Platform(96 * i - 60, 96 * 2 + 2) for i in range(19, 23)]
 
+    right_wall = [
+        Block(31 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+        else Block(31 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+        for i in range(-5, 9)
+    ]
+    right_right_wall = [
+        Block(32 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+        else Block(32 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+        for i in range(-5, 9)
+    ]
+    right_right_right_wall = [
+        Block(33 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+        else Block(33 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+        for i in range(-5, 9)
+    ]
+
     objects = [
         *plateform1,
         *plateform2,
@@ -1062,6 +1128,9 @@ def main(window, start_level=0):
         *left_wall,
         *left_left__wall,
         *left_left_left_wall,
+        *right_wall,
+        *right_right_wall,
+        *right_right_right_wall,
 
         TrashBin(-800, HEIGHT - 175 - 96, "green"),
         TrashBin(-640, HEIGHT - 175 - 96, "yellow"),
@@ -1070,8 +1139,12 @@ def main(window, start_level=0):
         ShadowBlock(-180, 0, 80, HEIGHT),
         Plot(-150, 536, 48, 72),
 
-        Waste(block_size * 10, HEIGHT - block_size * 4 - 75, "glassBottle.png", 1),
-        Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "cardboard.png", 2.7),
+        Waste(block_size * 3, 0, "glassBottle.png", 1),
+        Waste(block_size * 7, HEIGHT - block_size * 6 - 75, "cardboard.png", 2.7),
+        Waste(block_size * 12, HEIGHT - block_size * 4 - 75, "bottle.png", 2),
+        Waste(block_size * 15, HEIGHT - block_size * 2 - 75, "trashBag.png", 3),
+        Waste(block_size * 20, HEIGHT - block_size * 3 - 75, "tire.png", 3),
+        Waste(block_size * 25, HEIGHT - block_size * 2 - 75, "glassBottle.png", 1),
     ]
 
     water = Water(HEIGHT - 74, 200, 0.1)
@@ -1090,6 +1163,9 @@ def main(window, start_level=0):
     cpt = 0
     paused = False
     run = True
+
+    wrong_bin_timer = 0
+    throw_harder_timer = 0
 
     while run:
         clock.tick(FPS)
@@ -1133,16 +1209,10 @@ def main(window, start_level=0):
             # --- GESTION DE L'EAU (DÉGÂTS) ---
             if isinstance(obj, Water):
                 obj.update()
-                # On répare la noyade : 1 demi-cœur toutes les 2 secondes (120 frames)
+                # On meurt INSTANTANÉMENT si on touche l'eau
                 if player.hitbox.colliderect(obj.rect):
-                    player.water_timer += 1
-                    if player.water_timer >= FPS * 2:
-                        if not player.hit:  # On vérifie que le joueur n'est pas déjà en train de clignoter
-                            player.health -= 1
-                            player.make_hit()
-                        player.water_timer = 0
-                else:
-                    player.water_timer = 0
+                    player.health = 0
+                    death_message = "Vous avez noyé votre planète..."
 
             # --- GESTION DE L'AVION ---
             if isinstance(obj, Avion):
@@ -1162,18 +1232,25 @@ def main(window, start_level=0):
             if isinstance(obj, Waste):
                 obj.update(objects)
 
-                # CORRECTION BUG 3 : Le déchet disparaît s'il touche l'eau
-                if obj.rect.colliderect(water.rect):
+                # Le déchet disparaît s'il touche l'eau (SAUF pendant le tuto)
+                if obj.rect.colliderect(water.rect) and current_level > 0:
                     if obj in objects: objects.remove(obj)
                     continue
 
-                # Dégât si le déchet tombe sur le joueur
+                # Dégât si le déchet tombe sur le joueur (SAUF pendant le tuto)
                 if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
-                    # On le fait clignoter et on lui retire 1 demi-cœur
-                    if not player.hit:
-                        player.health -= 1
-                        player.make_hit()
-                    if obj in objects: objects.remove(obj)
+                    if current_level > 0:
+                        if not player.hit:
+                            player.health -= 1
+                            player.make_hit()
+                        if obj in objects: objects.remove(obj)
+                        continue
+
+                # --- TIR TROP FAIBLE (TUTO UNIQUEMENT) ---
+                # Si on est au tuto, que le déchet touche le sol, et qu'il est avant ou sur le plot (X <= 400)
+                if current_level == 0 and obj.on_ground and obj.rect.x <= -130:
+                    player.collect_trash(obj, objects)  # On remet l'objet dans l'inventaire
+                    throw_harder_timer = 120  # On lance l'affichage du message (2 secondes)
                     continue
 
                 for other in objects:
@@ -1202,16 +1279,32 @@ def main(window, start_level=0):
                                         if isinstance(o, Waste):
                                             objects.remove(o)
                             else:
+                                if current_level == 0:
+                                    # TUTO : Afficher l'alerte pendant 2 secondes
+                                    wrong_bin_timer = 120
 
-                                water.up(80)
-                                objects.remove(obj)
+                                    # On remet directement l'objet dans l'inventaire du joueur
+                                    player.collect_trash(obj, objects)
+                                else:
+                                    # NORMAL : Mauvais tri = l'eau monte !
+                                    water.up()  # <--- On retire le '80' ici
+                                    if obj in objects:
+                                        objects.remove(obj)
                             break
 
-        avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-        if avions_actifs < 2:
-            spawn_chance = 150 if current_level == 0 else (100 if current_level == 1 else 60)
-            if random.randint(1, spawn_chance) == 1 and cpt % 5 == 0:
-                spawn_avion(objects, current_level)
+        # --- SPAWN DES AVIONS (AUGMENTATION PAR NIVEAU) ---
+        if current_level > 0:
+            avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
+
+            # Limites d'avions simultanés par niveau
+            max_planes = {1: 2, 2: 5, 3: 10}.get(current_level, 0)
+
+            # Plus le niveau est haut, plus la chance de spawn par frame est élevée
+            spawn_chance = {1: 100, 2: 50, 3: 20}.get(current_level, 999)
+
+            if avions_actifs < max_planes:
+                if random.randint(1, spawn_chance) == 1:
+                    spawn_avion(objects, current_level)
 
         # --- CONDITION DE DÉFAITE ---
         if player.health <= 0:
@@ -1219,7 +1312,6 @@ def main(window, start_level=0):
             return rejouer
 
         # --- GESTION DE LA CAMÉRA ---
-        # Shift spécial si le joueur recule loin à gauche
         if player.hitbox.x <= -95 and not camera_shifted:
             saved_offset_x = offset_x
             saved_scroll = scroll
@@ -1231,7 +1323,6 @@ def main(window, start_level=0):
             scroll = saved_scroll
             camera_shifted = False
 
-        # Caméra normale suivant le joueur
         if not camera_shifted:
             if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                     (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
@@ -1241,8 +1332,18 @@ def main(window, start_level=0):
             if abs(scroll) > WIDTH:
                 scroll = 0
 
-        # Dessin global
-        draw(window, parallax_bg, player, objects, offset_x, frames_left)
+        # --- GESTION DES MESSAGES DU TUTO ---
+        if wrong_bin_timer > 0:
+            wrong_bin_timer -= 1
+        if throw_harder_timer > 0:
+            throw_harder_timer -= 1
+
+        # On récupère l'objectif du niveau actuel
+        level_goal = level_goals.get(current_level, 999)
+
+        # Dessin global (avec les nouvelles infos du compteur)
+        draw(window, parallax_bg, player, objects, offset_x, frames_left, wrong_bin_timer, throw_harder_timer,
+             total_recycled, level_goal)
 
     pygame.quit()
     quit()
@@ -1250,17 +1351,15 @@ def main(window, start_level=0):
 
 if __name__ == "__main__":
     jeu_en_cours = True
-    niveau_depart = 0  # Lance le Tuto la première fois
 
     while jeu_en_cours:
-        main_menu(window)  # Assure-toi que "window" est définie en amont dans ton code global
+        main_menu(window)
 
-        # Le jeu renvoie True si le joueur choisit "Espace" au game over
-        vouloir_rejouer = main(window, start_level=niveau_depart)
+        # On lance toujours au niveau 0 (Tuto)
+        vouloir_rejouer = main(window, start_level=2)
 
-        if vouloir_rejouer:
-            niveau_depart = 1  # S'il recommence, on saute le Tuto !
-        else:
+        # Si le joueur ne veut pas rejouer (il a fait Echap), on quitte
+        if not vouloir_rejouer:
             jeu_en_cours = False
 
     pygame.quit()
