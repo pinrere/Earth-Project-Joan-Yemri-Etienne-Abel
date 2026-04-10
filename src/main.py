@@ -853,7 +853,7 @@ class Water(Object):
 
         # 3 premières erreurs : montée lente (environ 30 pixels par erreur)
         if self.mistakes <= 3:
-            self.rect.y -= 5
+            self.rect.y -= 4
 
         # Erreurs suivantes : montée rapide (environ 65 pixels par erreur)
         else:
@@ -1381,7 +1381,7 @@ if __name__ == "__main__":
         main_menu(window)
 
         # On lance toujours au niveau 0 (Tuto)
-        vouloir_rejouer = main(window, start_level=0)
+        vouloir_rejouer = main(window, start_level=1)
 
         # Si le joueur ne veut pas rejouer (il a fait Echap), on quitte
         if not vouloir_rejouer:
