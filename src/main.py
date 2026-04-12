@@ -695,36 +695,71 @@ class Avion(Object):
         """Déplace l'avion horizontalement."""
         self.rect.x += self.speed * self.direction
 
-    def update(self, objects):
+    def update(self, objects, total_recycled=0, level_goal=999, is_rush_hour=False, player_trash_collected=0):
         """Met à jour la position, l'animation et gère le largage."""
         self.move()
         self.animation_count += 1
         self.drop_timer -= 1
 
-        # Zone de largage autorisée (On vérifie si l'avion n'est PAS entre 1310 et 1550)
         if self.drop_timer <= 0:
-            avion_x = self.rect.x
-            # On n'autorise le drop que si on est en dehors de la zone interdite
-            if not (1310 <= avion_x <= 1550):
-                if -140 <= avion_x <= 2800:
-                    self.drop_waste(objects)
-            self.reset_drop_timer()
+            # On tente de larguer un déchet (ajout du player_trash_collected pour le calcul)
+            self.drop_waste(objects, total_recycled, level_goal, player_trash_collected)
 
-    def drop_waste(self, objects):
-        # --- LIMITE MAX DE DÉCHETS PAR NIVEAU ---
-        max_wastes_per_level = {1: 5, 2: 25, 3: 125}
-        max_w = max_wastes_per_level.get(self.level, 0)
+            # --- GESTION DU TEMPS (1/5 du temps = Rush Hour) ---
+            if is_rush_hour:
+                self.drop_timer = random.randint(15, 30)  # Mitraillette
+            else:
+                self.drop_timer = random.randint(60, 120)  # Lent (sert juste de remplacement)
 
-        # On compte combien de déchets sont actuellement sur la map
-        current_waste = sum(1 for o in objects if isinstance(o, Waste) and not o.collected)
-
-        # Si on a atteint la limite, on ne lâche rien
-        if current_waste >= max_w:
-            return
-
+    def drop_waste(self, objects, total_recycled, level_goal, player_trash_collected):
         trash_x = self.rect.right - 20 if self.direction == -1 else self.rect.left + 20
         trash_y = self.rect.bottom - 15
 
+        # 1. Identifier la zone de l'avion
+        zone = 0
+        if 100 <= trash_x <= 700:
+            zone = 1
+        elif 700 < trash_x <= 1300:
+            zone = 2
+        elif 1580 <= trash_x <= 2080:
+            zone = 3
+        elif 2080 < trash_x <= 2570:
+            zone = 4
+
+        if zone == 0:
+            return
+
+        # 2. Définir la marge selon le niveau (+2, +3, +4)
+        marges_par_niveau = {1: 2, 2: 3, 3: 4}
+        marge = marges_par_niveau.get(self.level, 0)
+
+        wastes_on_map = [o for o in objects if isinstance(o, Waste) and not o.collected]
+
+        # 3. Limite visuelle (pas de surcharge sur la map)
+        if len(wastes_on_map) >= 6:
+            return
+
+        # 4. Limite GLOBALE STRICTE (Sol + Inventaire + Poubelle)
+        # Si un déchet est détruit, il quitte ce calcul, et l'avion le remplacera !
+        total_existing = len(wastes_on_map) + player_trash_collected + total_recycled
+        if total_existing >= (level_goal + marge):
+            return
+
+        # 5. Vérifier le quota spécifique de la ZONE
+        quota_zone = math.ceil((level_goal + marge) / 4)
+        wastes_in_zone = 0
+
+        for o in wastes_on_map:
+            ox = o.rect.x
+            if zone == 1 and 100 <= ox <= 700: wastes_in_zone += 1
+            elif zone == 2 and 700 < ox <= 1300: wastes_in_zone += 1
+            elif zone == 3 and 1580 <= ox <= 2080: wastes_in_zone += 1
+            elif zone == 4 and 2080 < ox <= 2570: wastes_in_zone += 1
+
+        if wastes_in_zone >= quota_zone:
+            return
+
+        # --- VALIDÉ : ON LARGUE LE DÉCHET ---
         test_rect = pygame.Rect(trash_x, trash_y, 30, 30)
         for obj in objects:
             if isinstance(obj, (Block, Bridge, Platform)) and test_rect.colliderect(obj.rect):
@@ -974,8 +1009,22 @@ def show_level_transition(window, level):
         titre = "NIVEAU 2"
         sous_titre = "Objectif : 15 déchets. Soyez rapide !"
     elif level == 3:
+        titre = "NIVEAU 3"
+        sous_titre = "Objectif : 20 déchets. L'enfer de la pollution !"
+    elif level == 4:
+        titre = "ÉVEIL ÉCOLOGIQUE"
+        sous_titre = "Trier ne suffit plus... il y en a trop !"
+        instructions_tuto = [
+            "Vous réalisez que l'entreprise pollue sans arrêt.",
+            "Il faut arrêter le problème à la racine !",
+            "Traversez la carte vers la droite pour trouver l'usine."
+        ]
+    elif level == 5:
         titre = "BOSS FINAL"
-        sous_titre = "Préparez-vous à l'affrontement !"
+        sous_titre = "Le PDG de la pollution vous attend."
+        instructions_tuto = [
+            "L'arène est prête. Préparez-vous à l'affrontement !"
+        ]
     else:
         return
 
@@ -1054,9 +1103,11 @@ def main(window, start_level=0):
     current_level = start_level
     total_recycled = 0
 
-    level_goals = {0: 6, 1: 10, 2: 15, 3: 20}
+    # Le niveau 4 (traversée) et 5 (boss) n'ont pas d'objectif de tri (donc 9999)
+    level_goals = {0: 6, 1: 10, 2: 15, 3: 20, 4: 9999, 5: 9999}
 
-    level_times = {0: 150, 1: 90, 2: 100, 3: 120}
+    # Temps par niveau (60s pour traverser, 300s pour le boss)
+    level_times = {0: 150, 1: 110, 2: 130, 3: 150, 4: 60, 5: 300}
     frames_left = level_times.get(current_level, 60) * FPS
 
     show_level_transition(window, current_level)
@@ -1245,14 +1296,22 @@ def main(window, start_level=0):
 
             # --- GESTION DE L'AVION ---
             if isinstance(obj, Avion):
-                obj.update(objects)
+                # Calcul de la phase "Rush Hour" (Le premier 1/5 du temps)
+                total_frames = level_times.get(current_level, 60) * FPS
+                frames_elapsed = total_frames - frames_left
+                is_rush_hour = frames_elapsed < (total_frames / 5)
+
+                # On met à jour avec la nouvelle info : player.trash_collected !
+                obj.update(objects, total_recycled, level_goals.get(current_level, 999), is_rush_hour,
+                           player.trash_collected)
+
                 # Destruction si l'avion sort de l'écran
-                if (obj.direction == 1 and obj.rect.left > 3500) or (obj.direction == -1 and obj.rect.right < -1500):
+                if (obj.direction == 1 and obj.rect.left > 3500) or (
+                        obj.direction == -1 and obj.rect.right < -1500):
                     if obj in objects: objects.remove(obj)
                     continue
 
                 if obj.rect.colliderect(player.hitbox):
-                    # CORRECTION BUG 1 : L'avion ne disparaît plus et fait très mal (1 cœur plein = 2 PV)
                     if not player.hit:
                         player.health -= 2
                         player.make_hit()
@@ -1303,6 +1362,29 @@ def main(window, start_level=0):
                                     for o in objects[:]:
                                         if isinstance(o, Waste):
                                             objects.remove(o)
+
+                                    # ---> AJOUTE CE BLOC ICI <---
+                                    # --- APPARITION DES 3 DÉCHETS INITIAUX (DANS LES BONNES ZONES) ---
+                                    if current_level in [1, 2, 3]:
+                                        zones_possibles = [(100, 700), (701, 1300), (1580, 2080), (2081, 2570)]
+                                        for _ in range(3):
+                                            zone_choisie = random.choice(zones_possibles)
+                                            spawn_x = random.randint(zone_choisie[0], zone_choisie[1])
+
+                                            r_file = random.choice(
+                                                ["tire.png", "glassBottle.png", "cardboard.png", "bottle.png",
+                                                 "trashBag.png"])
+                                            scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7,
+                                                      "bottle.png": 2, "trashBag.png": 3}
+                                            objects.append(Waste(spawn_x, 0, r_file, scales.get(r_file, 3)))
+                                        # ----------------------------
+
+                                    if current_level == 4:
+                                        for o in objects[:]:
+                                            # On supprime les blocs du mur de droite
+                                            if isinstance(o,
+                                                          Block) and o.rect.x >= 27 * block_size and o.rect.y < HEIGHT - block_size * 2:
+                                                objects.remove(o)
                             else:
                                 if current_level == 0:
                                     # TUTO : Afficher l'alerte pendant 2 secondes
@@ -1317,15 +1399,11 @@ def main(window, start_level=0):
                                         objects.remove(obj)
                             break
 
-        # --- SPAWN DES AVIONS (AUGMENTATION PAR NIVEAU) ---
+        # --- SPAWN DES AVIONS (TOUJOURS ACTIFS COMME OBSTACLES) ---
         if current_level > 0:
             avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-
-            # Limites d'avions simultanés par niveau
-            max_planes = {1: 2, 2: 5, 3: 10}.get(current_level, 0)
-
-            # Plus le niveau est haut, plus la chance de spawn par frame est élevée
-            spawn_chance = {1: 100, 2: 50, 3: 20}.get(current_level, 999)
+            max_planes = {1: 2, 2: 5, 3: 10, 4: 10}.get(current_level, 0)
+            spawn_chance = {1: 100, 2: 50, 3: 20, 4: 20}.get(current_level, 999)
 
             if avions_actifs < max_planes:
                 if random.randint(1, spawn_chance) == 1:
@@ -1335,6 +1413,45 @@ def main(window, start_level=0):
         if player.health <= 0:
             rejouer = game_over_screen(window, message=death_message)
             return rejouer
+
+        # --- PASSAGE VERS L'ARÈNE DU BOSS (NIVEAU 5) ---
+        if current_level == 4 and player.hitbox.x >= 28 * block_size:
+            current_level = 5
+            frames_left = level_times.get(current_level, 300) * FPS
+            show_level_transition(window, current_level)
+
+            # --- CRÉATION DE LA NOUVELLE MAP (ARÈNE DU BOSS) ---
+            objects.clear()  # On efface l'ancienne map
+
+            # Sol plat
+            boss_floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
+                          range(-10, 35)]
+            boss_bottom = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
+                           range(-10, 35)]
+
+            # Murs de l'arène
+            boss_left_wall = [
+                Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(
+                    -3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            boss_right_wall = [
+                Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(
+                    20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+
+            objects.extend(boss_floor)
+            objects.extend(boss_bottom)
+            objects.extend(boss_left_wall)
+            objects.extend(boss_right_wall)
+
+            # On place le joueur à l'entrée gauche de l'arène
+            player.hitbox.x = 100
+            player.hitbox.y = HEIGHT - block_size * 3
+
+            # Reset de la caméra
+            offset_x = 0
+            scroll = 0
+            saved_offset_x = 0
+            saved_scroll = 0
+            camera_shifted = False
 
         # --- GESTION DE LA CAMÉRA ---
         if player.hitbox.x <= -95 and not camera_shifted:
@@ -1381,7 +1498,7 @@ if __name__ == "__main__":
         main_menu(window)
 
         # On lance toujours au niveau 0 (Tuto)
-        vouloir_rejouer = main(window, start_level=1)
+        vouloir_rejouer = main(window, start_level=0)
 
         # Si le joueur ne veut pas rejouer (il a fait Echap), on quitte
         if not vouloir_rejouer:
