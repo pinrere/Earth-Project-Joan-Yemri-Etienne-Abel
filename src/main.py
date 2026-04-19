@@ -44,7 +44,7 @@ def load_sprites_from_folder(dir1, dir2, scale=2, direction=False):
 
     return all_sprites
 
-def load_sprite_sheets(dir1, dir2, width, height, direction = False):
+def load_sprite_sheets(dir1, dir2, width, height, direction=False):
     path = join("assets", dir1, dir2)
     images = [f for f in listdir(path) if isfile(join(path, f))]
 
@@ -103,12 +103,12 @@ class Button:
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 0.8
-    SPRITES = load_sprites_from_folder("MainCharacters", "MaleChar",3, True)
+    SPRITES = load_sprites_from_folder("MainCharacters", "MaleChar", 3, True)
     ANIMATION_DELAY = 4
 
     def __init__(self, x, y, width, height):
         super().__init__()
-        self.hitbox = pygame.Rect(x, y, width, height-2)
+        self.hitbox = pygame.Rect(x, y, width, height - 2)
         self.rect = self.hitbox.copy()
         self.x_vel = 0
         self.y_vel = 0
@@ -154,9 +154,7 @@ class Player(pygame.sprite.Sprite):
 
         for i in range(3):
             x_pos = bar_x + i * spacing
-
             win.blit(grey, (x_pos, bar_y))
-
             if self.health >= (i + 1) * 2:
                 win.blit(heart, (x_pos, bar_y))
             elif self.health == (i * 2) + 1:
@@ -183,7 +181,6 @@ class Player(pygame.sprite.Sprite):
             t = i * 1.5
             px = start_x + vx * t
             py = start_y + vy * t + 0.5 * Waste.GRAVITY * (t ** 2)
-
             pygame.draw.circle(win, (255, 255, 255), (int(px), int(py)), 2)
 
     def draw_inventory(self, win):
@@ -209,14 +206,12 @@ class Player(pygame.sprite.Sprite):
                 original_height = item_img.get_height()
 
                 ratio = target_max / max(original_width, original_height)
-
                 new_width = int(original_width * ratio)
                 new_height = int(original_height * ratio)
 
                 item_img = pygame.transform.scale(item_img, (new_width, new_height))
 
                 x_slot = start_x - (i * (slot_size + gap))
-
                 pos_x = x_slot + (slot_size - new_width) // 2
                 pos_y = start_y + (slot_size - new_height) // 2
 
@@ -293,15 +288,12 @@ class Player(pygame.sprite.Sprite):
 
         if self.hit:
             sprite_sheet = "hit"
-
         elif self.y_vel < 0:
             sprite_sheet = "jump"
             self.sprite_offset_y = 34
-
         elif self.y_vel > self.GRAVITY:
             sprite_sheet = "fall"
             self.sprite_offset_y = 34
-
         elif self.x_vel != 0:
             sprite_sheet = "run"
             if self.direction == "right":
@@ -337,8 +329,230 @@ class Player(pygame.sprite.Sprite):
             return True
         return False
 
+
+# =====================================================================
+# BOSS
+# =====================================================================
+
+class Boss:
+    """Le boss final : PDG de la pollution."""
+
+    ANIMATION_DELAY = 6
+    MAX_HP = 10
+    STOP_DISTANCE = 350   # Distance à laquelle il s'arrête pour tirer
+    WALK_SPEED = 2
+    WALK_SPEED_RAGE = 4
+
+    def __init__(self, x, y):
+        self.sprites = {}
+        boss_path = join("assets", "MainCharacters", "Boss")
+
+        for subfolder in ["player-stand", "player-run", "player-hurt", "player-shoot"]:
+            folder_path = join(boss_path, subfolder)
+            files = sorted([f for f in os.listdir(folder_path) if f.endswith(".png")])
+            frames = []
+            for f in files:
+                img = pygame.image.load(join(folder_path, f)).convert_alpha()
+                img = pygame.transform.scale_by(img, 3)
+                frames.append(img)
+
+            # Version gauche et droite
+            self.sprites[subfolder + "_left"] = [pygame.transform.flip(f, True, False) for f in frames]
+            self.sprites[subfolder + "_right"] = frames
+
+        sample = self.sprites["player-stand_left"][0]
+        self.width = sample.get_width() // 2
+        self.height = sample.get_height()
+        self.hitbox = pygame.Rect(x, y, self.width, self.height)
+
+        self.hp = self.MAX_HP
+        self.direction = "left"
+        self.animation_count = 0
+        self.current_anim = "player-stand"
+
+        # IA
+        self.state = "walk"
+        self.hurt_timer = 0
+        self.shoot_timer = 0
+        self.shoot_anim_timer = 0  # NOUVEAU : Pour gérer la durée de l'animation de tir
+        self.shoot_cooldown = 120
+        self.alive = True
+
+        self.sprite = self.sprites["player-stand_left"][0]
+
+    @property
+    def is_rage(self):
+        return self.hp <= self.MAX_HP // 2
+
+    def take_hit(self):
+        """Appelé quand un déchet touche le boss."""
+        if self.state == "hurt":
+            return  # Invincible pendant l'animation hurt
+        self.hp -= 1
+        self.state = "hurt"
+        self.hurt_timer = 40
+        self.animation_count = 0
+        if self.hp <= 0:
+            self.alive = False
+
+    def update(self, player, objects):
+        # --- TIMER HURT ---
+        if self.state == "hurt":
+            self.hurt_timer -= 1
+            if self.hurt_timer <= 0:
+                self.state = "walk"
+            self._animate("player-hurt")
+            return
+
+        # --- DIRECTION ---
+        if player.hitbox.centerx < self.hitbox.centerx:
+            self.direction = "left"
+        else:
+            self.direction = "right"
+
+        dist = abs(player.hitbox.centerx - self.hitbox.centerx)
+        speed = self.WALK_SPEED_RAGE if self.is_rage else self.WALK_SPEED
+
+        # --- COOLDOWN ET ANIMATION DE TIR ---
+        cooldown = 60 if self.is_rage else self.shoot_cooldown
+        self.shoot_timer -= 1
+
+        # Si l'animation de tir est en cours, il s'arrête et tire
+        if self.shoot_anim_timer > 0:
+            self.shoot_anim_timer -= 1
+            self._animate("player-shoot")
+        else:
+            if dist > self.STOP_DISTANCE:
+                # Avancer vers le joueur
+                self.state = "walk"
+                if player.hitbox.centerx < self.hitbox.centerx:
+                    self.hitbox.x -= speed
+                else:
+                    self.hitbox.x += speed
+                self._animate("player-run")
+            else:
+                # À portée : Prêt à tirer
+                self.state = "stand"
+                self._animate("player-stand")
+
+                # Déclenchement du tir
+                if self.shoot_timer <= 0:
+                    self.shoot_anim_timer = 25  # Fait durer l'animation de tir pendant 25 frames
+                    self._shoot(player, objects)  # Envoie les 'objects' pour faire spawner le déchet
+                    self.shoot_timer = cooldown
+
+        # --- Gravité basique pour que le boss reste au sol ---
+        self.hitbox.y += 8
+        for obj in objects:
+            if isinstance(obj, Block) and self.hitbox.colliderect(obj.rect):
+                self.hitbox.bottom = obj.rect.top
+                break
+
+    def _shoot(self, player, objects):
+        spawn_x = self.hitbox.centerx
+        spawn_y = self.hitbox.centery - 20
+
+        # On calcule la distance horizontale (dx) ET verticale (dy) vers le joueur
+        dx = player.hitbox.centerx - spawn_x
+        dy = player.hitbox.centery - spawn_y
+
+        # PARAMÈTRES PAR DÉFAUT (Normal)
+        nb_dechets = 1
+        flight_time = 45.0  # Temps de vol en frames (plus c'est grand, plus c'est lent et en cloche)
+        spread = 1.0  # Éparpillement
+
+        # CHANGEMENT DE PATTERN SELON LES PV
+        if self.hp <= 3:
+            # PHASE 3 : Panique (Shotgun)
+            nb_dechets = 4
+            flight_time = 32.0  # Rapide
+            spread = 4.0
+
+        elif self.hp <= 5:
+            # PHASE 2 : Rage (Sniper / Tir très rapide et tendu)
+            nb_dechets = 2
+            flight_time = 22.0  # Très rapide !
+            spread = 1.5
+
+        elif self.hp <= 8:
+            # PHASE 1.5 : S'énerve doucement
+            nb_dechets = 2
+            flight_time = 40.0
+            spread = 1.5
+
+        # --- CALCUL BALISTIQUE INTELLIGENT ---
+        # On calcule les vitesses exactes (X et Y) pour que le déchet retombe PILE sur le joueur
+        gravity = Waste.GRAVITY  # (0.8 dans ta classe Waste)
+
+        base_vx = dx / flight_time
+        base_vy = (dy / flight_time) - (0.5 * gravity * flight_time)
+
+        # On limite les vitesses extrêmes pour éviter les bugs si le joueur est collé au boss
+        base_vx = max(min(base_vx, 25), -25)
+        base_vy = max(min(base_vy, 10), -35)  # Max -35 vers le haut
+
+        # CRÉATION DES DÉCHETS
+        for _ in range(nb_dechets):
+            r_file = random.choice(["tire.png", "glassBottle.png", "cardboard.png", "bottle.png", "trashBag.png"])
+            scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
+
+            # On applique l'éparpillement (spread)
+            vx_final = base_vx + random.uniform(-spread, spread)
+            vy_final = base_vy + random.uniform(-spread, spread / 2)
+
+            trash = Waste(spawn_x, spawn_y, r_file, scale=scales.get(r_file, 3), vel_x=vx_final, vel_y=vy_final)
+            objects.append(trash)
+
+    def _animate(self, anim_name):
+        # Cherche la clé qui contient anim_name et la bonne direction
+        key = next((k for k in self.sprites if anim_name in k and k.endswith("_" + self.direction)), None)
+        if key is None:
+            key = next((k for k in self.sprites if anim_name in k and k.endswith("_left")), None)
+        sprites = self.sprites[key]
+        idx = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
+        self.sprite = sprites[idx]
+        self.animation_count += 1
+
+    def draw(self, win, offset_x):
+        # Sprite
+        draw_x = self.hitbox.x - offset_x - self.hitbox.width // 2
+        draw_y = self.hitbox.y + 50
+        win.blit(self.sprite, (draw_x, draw_y))
+        # Barre de vie
+        self._draw_health_bar(win)
+
+    def _draw_health_bar(self, win):
+        bar_width = 300
+        bar_height = 22
+        bar_x = WIDTH // 2 - bar_width // 2
+        bar_y = 140
+
+        # Fond
+        pygame.draw.rect(win, (60, 0, 0), (bar_x - 2, bar_y - 2, bar_width + 4, bar_height + 4), border_radius=6)
+        pygame.draw.rect(win, (30, 30, 30), (bar_x, bar_y, bar_width, bar_height), border_radius=5)
+
+        # Barre HP
+        ratio = max(0, self.hp / self.MAX_HP)
+        color = (220, 50, 50) if not self.is_rage else (255, 120, 0)
+        filled_w = int(bar_width * ratio)
+        if filled_w > 0:
+            pygame.draw.rect(win, color, (bar_x, bar_y, filled_w, bar_height), border_radius=5)
+
+        # Contour
+        pygame.draw.rect(win, (200, 200, 200), (bar_x, bar_y, bar_width, bar_height), 2, border_radius=5)
+
+        # Texte
+        font = pygame.font.SysFont("arial", 20, bold=True)
+        label = font.render(f"PDG DE LA POLLUTION  {self.hp} / {self.MAX_HP}", True, (255, 255, 255))
+        win.blit(label, (bar_x + bar_width // 2 - label.get_width() // 2, bar_y + 2))
+
+
+# =====================================================================
+# OBJETS
+# =====================================================================
+
 class Object(pygame.sprite.Sprite):
-    def __init__(self, x, y, width, height, name = None):
+    def __init__(self, x, y, width, height, name=None):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
         self.image = pygame.Surface((width, height), pygame.SRCALPHA)
@@ -349,25 +563,25 @@ class Object(pygame.sprite.Sprite):
     def draw(self, win, offset_x):
         win.blit(self.image, (self.rect.x - offset_x, self.rect.y))
 
+
 class ShadowBlock(Object):
     def __init__(self, x, y, width, height):
         super().__init__(x, y, width, height, "shadow")
-
         img = pygame.image.load(join("assets", "Other", "Shadow.png")).convert_alpha()
         img = pygame.transform.scale(img, (width, height))
-
         self.image.blit(img, (0, 0))
+
 
 class Plot(Object):
     def __init__(self, x, y, width, height):
         super().__init__(x, y, width, height, "plot")
         path = join("assets", "Other", "Plot.png")
         img = pygame.image.load(path).convert_alpha()
-
         self.image = pygame.transform.scale(img, (width, height))
 
     def draw(self, win, offset_x):
         win.blit(self.image, (self.rect.x - offset_x, self.rect.y))
+
 
 class Waste(Object):
     GRAVITY = 0.8
@@ -395,34 +609,17 @@ class Waste(Object):
         self.on_ground = False
         self.is_launched = False
 
-    def hit_vertical(self, objects):
-        self.rect.y += self.y_vel
-        for obj in objects:
-            if isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform):
-                if self.rect.colliderect(obj.rect):
-                    self.rect.bottom = obj.rect.top
-                    self.y_vel = 0
-                    break
-
     def update(self, objects, water=None):
         if not self.on_ground:
             self.y_vel += self.GRAVITY
 
-        # --- GESTION DE LA FLOTTAISON ---
         if water and self.rect.bottom > water.rect.y:
-            # Résistance de l'eau (ralentit la chute et les rebonds)
             self.x_vel *= 0.95
             self.y_vel *= 0.90
-
-            # On calcule la ligne de flottaison (à 70% de la hauteur de l'objet)
-            # + un petit mouvement de vague avec math.sin !
             vague = math.sin(pygame.time.get_ticks() / 200.0) * 5
             ligne_flottaison = water.rect.y + (self.rect.height * 0.7) + vague
-
-            # Si le bas de l'objet dépasse cette ligne, on le pousse vers le haut
             if self.rect.bottom > ligne_flottaison:
                 self.y_vel -= 1.5
-                # ---------------------------------
 
         self.x_vel *= self.FRICTION
 
@@ -430,9 +627,7 @@ class Waste(Object):
         self.rect.x = int(self.pos_x)
 
         for obj in objects:
-            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj,
-                                                                                Platform)) and self.rect.colliderect(
-                    obj.rect):
+            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
                 if self.x_vel > 0:
                     self.rect.right = obj.rect.left
                 elif self.x_vel < 0:
@@ -446,9 +641,7 @@ class Waste(Object):
         self.on_ground = False
 
         for obj in objects:
-            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj,
-                                                                                Platform)) and self.rect.colliderect(
-                    obj.rect):
+            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
                 if self.y_vel > 0:
                     self.rect.bottom = obj.rect.top
                     self.pos_y = self.rect.y
@@ -467,11 +660,13 @@ class Waste(Object):
             self.is_launched = False
             self.x_vel *= 0.9
 
+
 class Block(Object):
     def __init__(self, x, y, size_y, name, size_x=96):
         super().__init__(x, y, size_x, size_y)
         self.image = get_block(size_x, size_y, name)
         self.rect = pygame.Rect(x, y, size_x, size_y)
+
 
 class TrashBin(Object):
     def __init__(self, x, y, color):
@@ -502,15 +697,16 @@ class TrashBin(Object):
         self.hitbox.x = self.rect.x + self.rect.width * 0.25
         self.hitbox.y = self.rect.y + self.rect.height * 0.35
 
+
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect()
     nb_tiles = math.ceil(WIDTH / width) + 2
-
     return image, width, nb_tiles
 
 
-def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_timer, throw_harder_timer, total_recycled, level_goal):
+def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_timer, throw_harder_timer,
+         total_recycled, level_goal, boss=None):
     bg_parallax.draw(offset_x)
 
     for obj in objects:
@@ -526,22 +722,27 @@ def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_
             continue
         obj.draw(window, offset_x)
 
+    # Dessin du boss
+    if boss and boss.alive:
+        boss.draw(window, offset_x)
+
     player.draw(window, offset_x)
     player.draw_health_bar(window, offset_x)
     player.draw_trajectory(window, offset_x)
     player.draw_inventory(window)
 
-    # --- AFFICHAGE DU TIMER ---
+    # --- TIMER ---
     font_timer = pygame.font.SysFont("arial", 40, bold=True)
     secondes_restantes = max(0, frames_left // FPS)
     couleur = (255, 50, 50) if secondes_restantes <= 15 else (255, 255, 255)
     texte_timer = font_timer.render(f"Temps : {secondes_restantes}s", True, couleur)
     window.blit(texte_timer, (WIDTH // 2 - texte_timer.get_width() // 2, 20))
 
-    # --- AFFICHAGE DU COMPTEUR DE DÉCHETS ---
-    font_counter = pygame.font.SysFont("arial", 35, bold=True)
-    texte_counter = font_counter.render(f"Déchets : {total_recycled} / {level_goal}", True, (200, 255, 200)) # Une petite couleur verdâtre
-    window.blit(texte_counter, (WIDTH // 2 - texte_counter.get_width() // 2, 70)) # Placé juste en dessous du timer (y=70)
+    # --- COMPTEUR DÉCHETS (masqué pendant le boss) ---
+    if boss is None:
+        font_counter = pygame.font.SysFont("arial", 35, bold=True)
+        texte_counter = font_counter.render(f"Déchets : {total_recycled} / {level_goal}", True, (200, 255, 200))
+        window.blit(texte_counter, (WIDTH // 2 - texte_counter.get_width() // 2, 70))
 
     # --- MESSAGE : Mauvaise poubelle ---
     if wrong_bin_timer > 0:
@@ -567,25 +768,24 @@ def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_
 
     pygame.display.update()
 
+
 def handle_vertical_collision(player, objects):
     collided = []
 
     for obj in objects:
         if player.hitbox.colliderect(obj.rect):
-
             if player.y_vel > 0:
                 player.hitbox.bottom = obj.rect.top
                 player.y_vel = 0
                 player.jump_count = 0
-
             elif player.y_vel < 0:
                 player.hitbox.top = obj.rect.bottom
                 player.y_vel = 0
-
             collided.append(obj)
 
     player.rect.topleft = player.hitbox.topleft
     return collided
+
 
 def collide(player, objects, dx):
     player.hitbox.x += dx
@@ -599,6 +799,7 @@ def collide(player, objects, dx):
     player.hitbox.x -= dx
     player.rect.topleft = player.hitbox.topleft
     return collided_object
+
 
 def handle_move(player, objects, offset_x):
     keys = pygame.key.get_pressed()
@@ -634,8 +835,6 @@ def handle_move(player, objects, offset_x):
             v_x = max(min(v_x, MAX_SPEED), -MAX_SPEED)
             v_y = max(min(v_y, MAX_SPEED), -MAX_SPEED)
 
-            # --- CORRECTION BUG 2 : On fait spawn le déchet au-dessus de la tête ---
-            # Ça évite qu'il apparaisse "à l'intérieur" d'un mur si tu es collé à lui
             spawn_x = player.hitbox.centerx - 15
             spawn_y = player.hitbox.top - 40
 
@@ -651,24 +850,19 @@ def handle_move(player, objects, offset_x):
 
 
 class Avion(Object):
-    """Gère l'avion qui traverse l'écran et largue des déchets."""
-    ANIMATION_DELAY = 15  # Vitesse de l'animation (plus c'est bas, plus c'est rapide)
+    ANIMATION_DELAY = 15
 
     def __init__(self, x, y, direction=1, speed=3, level=0):
-        # Chargement et découpage du sprite sheet de l'avion
         path = join("assets", "Items", "Plane", "planeSprite.png")
         sprite_sheet = pygame.image.load(path).convert_alpha()
         self.sprites = []
         frame_width = 350
         frame_height = 150
-        scale = 1
 
         for i in range(7):
             surface = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA, 32)
             rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
             surface.blit(sprite_sheet, (0, 0), rect)
-            if scale != 1:
-                surface = pygame.transform.scale_by(surface, scale)
             self.sprites.append(surface)
 
         width = self.sprites[0].get_width()
@@ -682,75 +876,56 @@ class Avion(Object):
         self.reset_drop_timer()
 
     def reset_drop_timer(self):
-        """Définit le temps avant le prochain largage selon le niveau."""
-        # Un timer aléatoire permet une bonne répartition sur toute la map
         if self.level == 1:
-            self.drop_timer = random.randint(120, 200) # Lent
+            self.drop_timer = random.randint(120, 200)
         elif self.level == 2:
-            self.drop_timer = random.randint(50, 90)   # Rapide
+            self.drop_timer = random.randint(50, 90)
         elif self.level >= 3:
-            self.drop_timer = random.randint(15, 45)   # Mitraillette de déchets
+            self.drop_timer = random.randint(15, 45)
         else:
             self.drop_timer = 9999
 
     def move(self):
-        """Déplace l'avion horizontalement."""
         self.rect.x += self.speed * self.direction
 
     def update(self, objects, total_recycled=0, level_goal=999, is_rush_hour=False, player_trash_collected=0):
-        """Met à jour la position, l'animation et gère le largage."""
         self.move()
         self.animation_count += 1
         self.drop_timer -= 1
 
         if self.drop_timer <= 0:
-            # On tente de larguer un déchet (ajout du player_trash_collected pour le calcul)
             self.drop_waste(objects, total_recycled, level_goal, player_trash_collected)
-
-            # --- GESTION DU TEMPS (1/5 du temps = Rush Hour) ---
             if is_rush_hour:
-                self.drop_timer = random.randint(15, 30)  # Mitraillette
+                self.drop_timer = random.randint(15, 30)
             else:
-                self.drop_timer = random.randint(60, 120)  # Lent (sert juste de remplacement)
+                self.drop_timer = random.randint(60, 120)
 
     def drop_waste(self, objects, total_recycled, level_goal, player_trash_collected):
         trash_x = self.rect.right - 20 if self.direction == -1 else self.rect.left + 20
         trash_y = self.rect.bottom - 15
 
-        # 1. Identifier la zone de l'avion
         zone = 0
-        if 100 <= trash_x <= 700:
-            zone = 1
-        elif 700 < trash_x <= 1300:
-            zone = 2
-        elif 1580 <= trash_x <= 2080:
-            zone = 3
-        elif 2080 < trash_x <= 2570:
-            zone = 4
+        if 100 <= trash_x <= 700: zone = 1
+        elif 700 < trash_x <= 1300: zone = 2
+        elif 1580 <= trash_x <= 2080: zone = 3
+        elif 2080 < trash_x <= 2570: zone = 4
 
         if zone == 0:
             return
 
-        # 2. Définir la marge selon le niveau (+2, +3, +4)
         marges_par_niveau = {1: 2, 2: 3, 3: 4}
         marge = marges_par_niveau.get(self.level, 0)
-
         wastes_on_map = [o for o in objects if isinstance(o, Waste) and not o.collected]
 
-        # 3. Limite visuelle (pas de surcharge sur la map)
         if len(wastes_on_map) >= 6:
             return
 
-        # 4. Limite GLOBALE STRICTE (Sol + Inventaire + Poubelle)
-        # Si un déchet est détruit, il quitte ce calcul, et l'avion le remplacera !
         total_existing = len(wastes_on_map) + player_trash_collected + total_recycled
         if total_existing >= (level_goal + marge):
             return
 
-        # 5. Vérifier le quota spécifique de la ZONE
         quota_zone = math.ceil((level_goal + marge) / 4)
         wastes_in_zone = 0
-
         for o in wastes_on_map:
             ox = o.rect.x
             if zone == 1 and 100 <= ox <= 700: wastes_in_zone += 1
@@ -761,7 +936,6 @@ class Avion(Object):
         if wastes_in_zone >= quota_zone:
             return
 
-        # --- VALIDÉ : ON LARGUE LE DÉCHET ---
         test_rect = pygame.Rect(trash_x, trash_y, 30, 30)
         for obj in objects:
             if isinstance(obj, (Block, Bridge, Platform)) and test_rect.colliderect(obj.rect):
@@ -770,59 +944,44 @@ class Avion(Object):
         random_file = random.choice(["tire.png", "glassBottle.png", "cardboard.png", "bottle.png", "trashBag.png"])
         scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
         s = scales.get(random_file, 3)
-
         trash = Waste(trash_x, trash_y, random_file, scale=s, vel_x=self.speed * self.direction, vel_y=2)
         objects.append(trash)
 
     def draw(self, win, offset_x):
-        """Affiche l'avion avec la bonne frame d'animation et direction."""
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(self.sprites)
         sprite = self.sprites[sprite_index]
-
         if self.direction == -1:
             sprite = pygame.transform.flip(sprite, True, False)
-
         win.blit(sprite, (self.rect.x - offset_x, self.rect.y))
 
+
 def spawn_avion(objects, level):
-    direction = random.choice([1,-1])
+    direction = random.choice([1, -1])
     spawn_x = -1500 if direction == 1 else 3500
 
-    # Vitesse grandement augmentée pour parcourir toute la map et bien répartir
-    if level == 0:
-        speed = random.randint(2, 4)
-    elif level == 1:
-        speed = random.randint(4, 7)
-    elif level == 2:
-        speed = random.randint(7, 12)
-    else:
-        speed = random.randint(10, 16)
+    if level == 0: speed = random.randint(2, 4)
+    elif level == 1: speed = random.randint(4, 7)
+    elif level == 2: speed = random.randint(7, 12)
+    else: speed = random.randint(10, 16)
 
-    # On fait varier la hauteur Y (entre 0 et 150) pour que les avions ne se superposent pas
     spawn_y = random.randint(0, 150)
-
     avion = Avion(spawn_x, spawn_y, direction, speed=speed, level=level)
     objects.append(avion)
 
 
 class Bridge(Object):
-    """Gère l'affichage et la collision du pont."""
-
     def __init__(self, x, y, width, bottom_img, top_img):
         super().__init__(x, y, width, bottom_img.get_height(), "bridge")
         self.bottom_img = bottom_img
         self.top_img = top_img
-        # Zone de collision (épaisseur de 20px pour marcher)
         self.rect = pygame.Rect(x, y, width, 20)
 
     def draw(self, win, offset_x):
         win.blit(self.bottom_img, (self.rect.x - offset_x, self.rect.y))
-        # Rambarde posée sur le pont (soustraction de la hauteur)
         win.blit(self.top_img, (self.rect.x - offset_x, self.rect.y - self.top_img.get_height() + 3))
 
 
 class ParallaxBackground:
-
     def __init__(self, win):
         self.window = win
         self.width = win.get_width()
@@ -835,11 +994,9 @@ class ParallaxBackground:
         ]
 
     def draw(self, offset_x):
-        """Dessine les calques de fond en boucle infinie."""
         for layer in self.layers:
             rel_x = (offset_x * layer["speed"]) % self.width
             self.window.blit(layer["img"], (-rel_x, self.y_offset))
-
             if rel_x > 0:
                 self.window.blit(layer["img"], (self.width - rel_x, self.y_offset))
             else:
@@ -861,50 +1018,36 @@ class Water(Object):
             surface.blit(sprite_sheet, (0, 0), pygame.Rect(0, i * 50, 200, 50))
             self.sprites.append(surface)
 
-        self.image = self.sprites[0] # <--- CORRECTION : On met le pour prendre la 1ère frame
+        self.image = self.sprites[0]
         self.animation_count = 0
         self.speed = speed
         self.mistakes = 0
 
     def update(self):
-        """Met à jour l'animation de l'écume."""
         self.animation_count += 1
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(self.sprites)
-        self.image = self.sprites[sprite_index] # <--- CORRECTION : On met le pour animer
+        self.image = self.sprites[sprite_index]
 
     def draw(self, win, offset_x):
-        """Dessine le corps de l'eau (rectangle) et la surface animée (sprites)."""
-        pygame.draw.rect(
-            win,
-            self.SURFACE_COLOR,
-            (self.rect.x - offset_x, self.rect.y + 50, self.rect.width, self.rect.height + 800)
-        )
-
+        pygame.draw.rect(win, self.SURFACE_COLOR,
+                         (self.rect.x - offset_x, self.rect.y + 50, self.rect.width, self.rect.height + 800))
         sprite_w = self.image.get_width()
         for x in range(0, self.rect.width, sprite_w):
             win.blit(self.image, (self.rect.x + x - offset_x, self.rect.y))
 
     def up(self):
-        """Fait monter le niveau de l'eau de façon non-linéaire."""
         self.mistakes += 1
-
-        # 3 premières erreurs : montée lente (environ 30 pixels par erreur)
         if self.mistakes <= 3:
             self.rect.y -= 4
-
-        # Erreurs suivantes : montée rapide (environ 65 pixels par erreur)
         else:
             self.rect.y -= 30
 
 
 class Platform(Object):
-    """Plateforme basique."""
-
     def __init__(self, x, y):
         width = 120
         height = 30
         super().__init__(x, y, width, height, "platform")
-
         img = pygame.image.load(join("assets", "Terrain", "plateform.png")).convert_alpha()
         self.image = pygame.transform.scale(img, (width, height))
         self.rect = pygame.Rect(x, y, width, height)
@@ -918,18 +1061,13 @@ def main_menu(window):
     clock = pygame.time.Clock()
     parallax_bg = ParallaxBackground(window)
 
-    # --- CHARGEMENT DES BLOCS POUR LE SOL ---
     block_size = 96
     grass_img = get_block(block_size, block_size, "dirtGrassBlock.png")
     dirt_img = get_block(block_size, block_size, "dirtBlock.png")
 
-    # --- BOUTONS ---
-    # On centre les boutons horizontalement (WIDTH // 2)
-    # Le bouton Jouer est un peu plus haut, le bouton Quitter en dessous
     play_btn = Button(WIDTH // 2 - 75, HEIGHT // 2 - 60, "bouttonJouer.png")
     quit_btn = Button(WIDTH // 2 - 75, HEIGHT // 2 + 70, "bouttonQuitter.png")
 
-    # --- LE JOUEUR (Visuel) ---
     menu_player = Player(WIDTH // 2 + 200, HEIGHT // 2 - 50, 60, 96)
     menu_player.direction = "right"
 
@@ -945,16 +1083,13 @@ def main_menu(window):
                 pygame.quit()
                 exit()
 
-        # 1. Dessin du Parallax
         parallax_bg.draw(menu_scroll)
 
-        # 2. Dessin du SOL
         for i in range(-1, (WIDTH // block_size) + 2):
             x_pos = (i * block_size) - ((menu_scroll * 0.7) % block_size)
             window.blit(grass_img, (x_pos, HEIGHT - block_size * 2))
             window.blit(dirt_img, (x_pos, HEIGHT - block_size))
 
-        # 3. Animation du Joueur
         menu_player.x_vel = 0
         menu_player.update_sprite()
         window.blit(menu_player.sprite, (menu_player.hitbox.x - menu_player.sprite_offset_x,
@@ -971,7 +1106,6 @@ def main_menu(window):
 
 
 def draw_pause_menu(window):
-    """Affiche l'overlay de pause."""
     font = pygame.font.SysFont("arial", 80)
     text = font.render("PAUSE", True, (255, 255, 255))
     window.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 3))
@@ -980,15 +1114,10 @@ def draw_pause_menu(window):
     text2 = font_small.render("Appuie sur Echap pour reprendre", True, (200, 200, 200))
     window.blit(text2, (WIDTH // 2 - text2.get_width() // 2, HEIGHT // 2))
 
-    # À décommenter une fois les boutons ajoutés
-    # resume_btn.draw(window)
-    # quit_btn.draw(window)
-
     pygame.display.update()
 
 
 def show_level_transition(window, level):
-    """Affiche l'écran de transition et attend l'appui sur Espace."""
     font_titre = pygame.font.SysFont('Arial', 80, bold=True)
     font_sous_titre = pygame.font.SysFont('Arial', 40)
     font_instructions = pygame.font.SysFont('Arial', 30)
@@ -1025,7 +1154,9 @@ def show_level_transition(window, level):
         titre = "BOSS FINAL"
         sous_titre = "Le PDG de la pollution vous attend."
         instructions_tuto = [
-            "L'arène est prête. Préparez-vous à l'affrontement !"
+            "Ramassez les déchets avec E, lancez-les sur le boss avec MAJ + Clic !",
+            "Esquivez ses projectiles et visez bien.",
+            "En dessous de 5 PV, il entre en RAGE !"
         ]
     else:
         return
@@ -1044,14 +1175,12 @@ def show_level_transition(window, level):
         texte = font_instructions.render(ligne, True, (200, 200, 255))
         window.blit(texte, texte.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 30 + (i * 35))))
 
-    # Indicateur pour lancer le jeu
     font_espace = pygame.font.SysFont('Arial', 35, italic=True)
     t3 = font_espace.render("Appuyez sur ESPACE pour commencer...", True, (255, 255, 150))
     window.blit(t3, t3.get_rect(center=(WIDTH // 2, HEIGHT - 100)))
 
     pygame.display.update()
 
-    # Boucle d'attente
     attente = True
     while attente:
         for event in pygame.event.get():
@@ -1064,16 +1193,14 @@ def show_level_transition(window, level):
 
 
 def game_over_screen(window, message="VOUS ÊTES MORT"):
-    """Affiche l'écran de fin de partie avec le choix de rejouer et la cause de la mort."""
     clock = pygame.time.Clock()
 
-    # On adapte la police et la couleur selon si c'est un game over classique ou par l'eau
     if message == "VOUS ÊTES MORT":
         font_titre = pygame.font.SysFont('Arial', 100, bold=True)
         couleur_titre = (255, 50, 50)
     else:
-        font_titre = pygame.font.SysFont('Arial', 70, bold=True)  # Plus petit car la phrase est longue
-        couleur_titre = (100, 200, 255)  # Couleur bleutée pour l'eau
+        font_titre = pygame.font.SysFont('Arial', 70, bold=True)
+        couleur_titre = (100, 200, 255)
 
     font_texte = pygame.font.SysFont('Arial', 40)
 
@@ -1099,16 +1226,48 @@ def game_over_screen(window, message="VOUS ÊTES MORT"):
                 if event.key == pygame.K_ESCAPE: return False
 
 
+def victory_screen(window):
+    """Écran de victoire après avoir vaincu le boss."""
+    clock = pygame.time.Clock()
+
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 20, 0, 220))
+    window.blit(overlay, (0, 0))
+
+    font_titre = pygame.font.SysFont('Arial', 80, bold=True)
+    font_sous = pygame.font.SysFont('Arial', 40)
+    font_btn = pygame.font.SysFont('Arial', 35)
+
+    titre = font_titre.render("VOUS AVEZ SAUVÉ LA PLANÈTE !", True, (100, 255, 100))
+    sous = font_sous.render("Le PDG de la pollution a été vaincu grâce à vous.", True, (200, 255, 200))
+    btn = font_btn.render("ESPACE pour rejouer  |  ECHAP pour quitter", True, (255, 255, 255))
+
+    window.blit(titre, titre.get_rect(center=(WIDTH // 2, HEIGHT // 3)))
+    window.blit(sous, sous.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+    window.blit(btn, btn.get_rect(center=(WIDTH // 2, HEIGHT * 2 // 3)))
+
+    pygame.display.update()
+
+    while True:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE: return True
+                if event.key == pygame.K_ESCAPE: return False
+
+
+# =====================================================================
+# BOUCLE PRINCIPALE
+# =====================================================================
 
 def main(window, start_level=0):
     clock = pygame.time.Clock()
     current_level = start_level
     total_recycled = 0
 
-    # Le niveau 4 (traversée) et 5 (boss) n'ont pas d'objectif de tri (donc 9999)
     level_goals = {0: 6, 1: 10, 2: 15, 3: 1, 4: 9999, 5: 9999}
-
-    # Temps par niveau (60s pour traverser, 300s pour le boss)
     level_times = {0: 150, 1: 110, 2: 130, 3: 200, 4: 60, 5: 300}
     frames_left = level_times.get(current_level, 60) * FPS
 
@@ -1117,7 +1276,6 @@ def main(window, start_level=0):
     parallax_bg = ParallaxBackground(window)
     block_size = 96
 
-    # Initialisation des éléments du pont
     img_top = pygame.image.load(join("assets", "Terrain", "topBridge.png")).convert_alpha()
     img_bottom = pygame.image.load(join("assets", "Terrain", "bottomBridge.png")).convert_alpha()
     bridge_width = 308
@@ -1131,81 +1289,51 @@ def main(window, start_level=0):
     player = Player(400, 520, 60, 96)
 
     floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
-             range(-10, 23) if i not in [3,4,5,9,10,11,12,13,14,15,16,17,18,19,20]]
+             range(-10, 23) if i not in [3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]]
     floor += [Block(i * block_size, HEIGHT - block_size * 4, block_size, "dirtGrassBlock.png") for i in
-             range(14,27) if i not in [16,17,18,21,22,23,24]]
-    floor += [Block(i * block_size, HEIGHT -block_size, block_size, "dirtGrassBlock.png") for i in
-              range(9, 25) if i not in [14,15,16,17,18,19,20,21,22]]
-    floor += [Block(6 * block_size, HEIGHT - block_size*6, block_size, "dirtGrassBlock.png")]
+              range(14, 27) if i not in [16, 17, 18, 21, 22, 23, 24]]
+    floor += [Block(i * block_size, HEIGHT - block_size, block_size, "dirtGrassBlock.png") for i in
+              range(9, 25) if i not in [14, 15, 16, 17, 18, 19, 20, 21, 22]]
+    floor += [Block(6 * block_size, HEIGHT - block_size * 6, block_size, "dirtGrassBlock.png")]
 
     bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
-                    range(-10, 27) if i not in [3,4,5,9,10,11,12,13,16,17,18,23,24]]
+                    range(-10, 27) if i not in [3, 4, 5, 9, 10, 11, 12, 13, 16, 17, 18, 23, 24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtBlock.png") for i in
-                    range(14, 27) if i not in [16,17,18,21,22,23,24]]
+                     range(14, 27) if i not in [16, 17, 18, 21, 22, 23, 24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 3, block_size, "dirtBlock.png") for i in
-                     range(14, 27) if i not in [16, 17, 18, 21, 22,23,24]]
+                     range(14, 27) if i not in [16, 17, 18, 21, 22, 23, 24]]
     bottom_floor += [Block(6 * block_size, HEIGHT - block_size * 5, block_size, "dirtBlock.png")]
-    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 7, block_size, "dirtBlock.png") for i in
-                     range(14, 16)]
-    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 8, block_size, "dirtBlock.png") for i in
-                     range(14, 16)]
-    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 9, block_size, "dirtBlock.png") for i in
-                     range(14, 16)]
-    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 10, block_size, "dirtBlock.png") for i in
-                     range(14, 16)]
-    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 11, block_size, "dirtBlock.png") for i in
-                     range(14, 16)]
-    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 12, block_size, "dirtBlock.png") for i in
-                     range(14, 16)]
-    left_wall = [
-        Block(-960, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(-960, i * block_size, block_size,
-                                                                                      "dirtGrassBlock.png") for i in
-        range(-5, 9)]
-    left_left__wall = [
-        Block(-1056, j * block_size, block_size, "dirtBlock.png") if j != 0 else Block(-1056, j * block_size,
-                                                                                       block_size, "dirtGrassBlock.png")
-        for j in range(-5, 9)]
-    left_left_left_wall = [
-        Block(-1152, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(-1152, i * block_size,
-                                                                                       block_size, "dirtGrassBlock.png")
-        for i in range(-5, 9)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 7, block_size, "dirtBlock.png") for i in range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 8, block_size, "dirtBlock.png") for i in range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 9, block_size, "dirtBlock.png") for i in range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 10, block_size, "dirtBlock.png") for i in range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 11, block_size, "dirtBlock.png") for i in range(14, 16)]
+    bottom_floor += [Block(i * block_size, HEIGHT - block_size * 12, block_size, "dirtBlock.png") for i in range(14, 16)]
+
+    left_wall = [Block(-960, i * block_size, block_size, "dirtBlock.png") if i != 0
+                 else Block(-960, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+    left_left__wall = [Block(-1056, j * block_size, block_size, "dirtBlock.png") if j != 0
+                       else Block(-1056, j * block_size, block_size, "dirtGrassBlock.png") for j in range(-5, 9)]
+    left_left_left_wall = [Block(-1152, i * block_size, block_size, "dirtBlock.png") if i != 0
+                           else Block(-1152, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
 
     plateform1 = [Platform(100 + i * 120, 150) for i in range(2)]
-
     plateform2 = [Platform(96 * i - 60, 96 * 4 + 2) for i in range(7, 10)]
-
     plateform3 = [Platform(96 * i - 60, 96 * 2 + 2) for i in range(19, 23)]
 
-    right_wall = [
-        Block(27 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-        else Block(27 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
-        for i in range(-5, 9)
-    ]
-    right_right_wall = [
-        Block(28 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-        else Block(28 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
-        for i in range(-5, 9)
-    ]
-    right_right_right_wall = [
-        Block(29 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-        else Block(29 * block_size, i * block_size, block_size, "dirtGrassBlock.png")
-        for i in range(-5, 9)
-    ]
+    right_wall = [Block(27 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                  else Block(27 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+    right_right_wall = [Block(28 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                        else Block(28 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+    right_right_right_wall = [Block(29 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                               else Block(29 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
 
     objects = [
-        *plateform1,
-        *plateform2,
-        *plateform3,
-        bridge1,
-        bridge2,
-        *bottom_floor,
-        *floor,
-        *left_wall,
-        *left_left__wall,
-        *left_left_left_wall,
-        *right_wall,
-        *right_right_wall,
-        *right_right_right_wall,
+        *plateform1, *plateform2, *plateform3,
+        bridge1, bridge2,
+        *bottom_floor, *floor,
+        *left_wall, *left_left__wall, *left_left_left_wall,
+        *right_wall, *right_right_wall, *right_right_right_wall,
 
         TrashBin(-800, HEIGHT - 175 - 96, "green"),
         TrashBin(-640, HEIGHT - 175 - 96, "yellow"),
@@ -1225,8 +1353,9 @@ def main(window, start_level=0):
     water = Water(HEIGHT - 74, 200, 0.1)
     objects.append(water)
 
+    # Boss (None jusqu'au niveau 5)
+    boss = None
 
-    # Paramètres de caméra
     offset_x = 0
     scroll_area_width = 200
     scroll = 0
@@ -1241,6 +1370,10 @@ def main(window, start_level=0):
 
     wrong_bin_timer = 0
     throw_harder_timer = 0
+
+    # Timer spawn déchets boss
+    boss_waste_spawn_timer = 0
+    BOSS_WASTE_SPAWN_COOLDOWN = 180  # 3 secondes
 
     while run:
         clock.tick(FPS)
@@ -1268,15 +1401,13 @@ def main(window, start_level=0):
         handle_move(player, objects, offset_x)
         player.loop(FPS)
 
-        # --- VÉRIFICATION MORT PAR L'EAU (STRICTE) ---
         if player.hitbox.colliderect(water.rect):
             player.health = 0
-            player.y_vel = 0  # Le joueur arrête de tomber, il flotte (mort)
+            player.y_vel = 0
             death_message = "L'océan a repris ses droits..."
 
         handle_vertical_collision(player, objects)
 
-        # Règle de tri des déchets
         WASTE_TYPES = {
             "glassBottle.png": "green",
             "cardboard.png": "yellow",
@@ -1285,130 +1416,147 @@ def main(window, start_level=0):
             "trashBag.png": "black"
         }
 
-        # Parcours et mise à jour des objets
-        for obj in objects[:]:
+        # =====================================================================
+        # NIVEAU 5 : COMBAT DE BOSS
+        # =====================================================================
+        if current_level == 5 and boss is not None:
 
-            # --- GESTION DE L'EAU (DÉGÂTS) ---
-            if isinstance(obj, Water):
-                obj.update()
-                # On meurt INSTANTANÉMENT si on touche l'eau
-                if player.hitbox.colliderect(obj.rect):
-                    player.health = 0
-                    death_message = "Vous avez noyé votre planète..."
+            # --- MISE À JOUR DU BOSS ---
+            boss.update(player, objects)
 
-            # --- GESTION DE L'AVION ---
-            if isinstance(obj, Avion):
-                # Calcul de la phase "Rush Hour" (Le premier 1/5 du temps)
-                total_frames = level_times.get(current_level, 60) * FPS
-                frames_elapsed = total_frames - frames_left
-                is_rush_hour = frames_elapsed < (total_frames / 5)
+            # --- GESTION DES DÉCHETS (Dégâts et Lancers) ---
+            for obj in objects[:]:
+                if isinstance(obj, Waste):
+                    # Gravité et rebonds
+                    obj.update(objects)
 
-                # On met à jour avec la nouvelle info : player.trash_collected !
-                obj.update(objects, total_recycled, level_goals.get(current_level, 999), is_rush_hour,
-                           player.trash_collected)
-
-                # Destruction si l'avion sort de l'écran
-                if (obj.direction == 1 and obj.rect.left > 3500) or (
-                        obj.direction == -1 and obj.rect.right < -1500):
-                    if obj in objects: objects.remove(obj)
-                    continue
-
-                if obj.rect.colliderect(player.hitbox):
-                    if not player.hit:
-                        player.health -= 2
-                        player.make_hit()
-
-            # --- GESTION DES DÉCHETS (RECYCLAGE ET ERREURS) ---
-            if isinstance(obj, Waste):
-                # On ajoute 'water' pour que la physique d'eau fonctionne
-                obj.update(objects, water=water)
-
-                # Dégât si le déchet tombe sur le joueur (SAUF pendant le tuto)
-                if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
-                    if current_level > 0:
+                    # 1. SI LE DÉCHET VOLE ET TE TOUCHE = DÉGÂTS
+                    if obj.rect.colliderect(player.hitbox) and not obj.on_ground and not obj.is_launched:
                         if not player.hit:
                             player.health -= 1
                             player.make_hit()
+                        # Le déchet explose/disparaît quand il te blesse
+                        if obj in objects:
+                            objects.remove(obj)
+                        continue
+
+                    # 2. SI TU AS LANCÉ LE DÉCHET ET QU'IL TOUCHE LE BOSS = DÉGÂTS AU BOSS
+                    if obj.is_launched and obj.rect.colliderect(boss.hitbox):
+                        boss.take_hit()
+                        if obj in objects:
+                            objects.remove(obj)
+
+            # --- VICTOIRE ---
+            if not boss.alive:
+                draw(window, parallax_bg, player, objects, offset_x, frames_left,
+                     wrong_bin_timer, throw_harder_timer, total_recycled,
+                     level_goals.get(current_level, 999), boss)
+                pygame.time.wait(800)
+                rejouer = victory_screen(window)
+                return rejouer
+
+        # =====================================================================
+        # NIVEAUX 0-4 : LOGIQUE NORMALE
+        # =====================================================================
+        else:
+            for obj in objects[:]:
+
+                if isinstance(obj, Water):
+                    obj.update()
+                    if player.hitbox.colliderect(obj.rect):
+                        player.health = 0
+                        death_message = "Vous avez noyé votre planète..."
+
+                if isinstance(obj, Avion):
+                    total_frames = level_times.get(current_level, 60) * FPS
+                    frames_elapsed = total_frames - frames_left
+                    is_rush_hour = frames_elapsed < (total_frames / 5)
+
+                    obj.update(objects, total_recycled, level_goals.get(current_level, 999), is_rush_hour,
+                               player.trash_collected)
+
+                    if (obj.direction == 1 and obj.rect.left > 3500) or (obj.direction == -1 and obj.rect.right < -1500):
                         if obj in objects: objects.remove(obj)
                         continue
 
-                # --- TIR TROP FAIBLE (TUTO UNIQUEMENT) ---
-                # Si on est au tuto, que le déchet touche le sol, et qu'il est avant ou sur le plot (X <= 400)
-                if current_level == 0 and obj.on_ground and obj.rect.x <= -130:
-                    player.collect_trash(obj, objects)  # On remet l'objet dans l'inventaire
-                    throw_harder_timer = 120  # On lance l'affichage du message (2 secondes)
-                    continue
+                    if obj.rect.colliderect(player.hitbox):
+                        if not player.hit:
+                            player.health -= 2
+                            player.make_hit()
 
-                for other in objects:
-                    if isinstance(other, TrashBin):
-                        if obj.rect.colliderect(other.hitbox) and obj.is_launched:
-                            correct_color = WASTE_TYPES.get(obj.filename)
-                            if correct_color == other.color:
-                                # Bon tri
-                                objects.remove(obj)
-                                total_recycled += 1
-                                if total_recycled >= level_goals.get(current_level, 999):
-                                    current_level += 1
-                                    total_recycled = 0
-                                    frames_left = level_times.get(current_level, 60) * FPS
-                                    show_level_transition(window, current_level)
+                if isinstance(obj, Waste):
+                    obj.update(objects, water=water)
 
-                                    player.hitbox.x = 400
-                                    player.hitbox.y = 520
-                                    player.x_vel = 0
+                    if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
+                        if current_level > 0:
+                            if not player.hit:
+                                player.health -= 1
+                                player.make_hit()
+                            if obj in objects: objects.remove(obj)
+                            continue
 
-                                    player.inventory.clear()
-                                    player.trash_collected = 0
+                    if current_level == 0 and obj.on_ground and obj.rect.x <= -130:
+                        player.collect_trash(obj, objects)
+                        throw_harder_timer = 120
+                        continue
 
-                                    for o in objects[:]:
-                                        if isinstance(o, Waste):
-                                            objects.remove(o)
+                    for other in objects:
+                        if isinstance(other, TrashBin):
+                            if obj.rect.colliderect(other.hitbox) and obj.is_launched:
+                                correct_color = WASTE_TYPES.get(obj.filename)
+                                if correct_color == other.color:
+                                    objects.remove(obj)
+                                    total_recycled += 1
+                                    if total_recycled >= level_goals.get(current_level, 999):
+                                        current_level += 1
+                                        total_recycled = 0
+                                        frames_left = level_times.get(current_level, 60) * FPS
+                                        show_level_transition(window, current_level)
 
-                                    # ---> AJOUTE CE BLOC ICI <---
-                                    # --- APPARITION DES 3 DÉCHETS INITIAUX (DANS LES BONNES ZONES) ---
-                                    if current_level in [1, 2, 3]:
-                                        zones_possibles = [(100, 700), (701, 1300), (1580, 2080), (2081, 2570)]
-                                        for _ in range(3):
-                                            zone_choisie = random.choice(zones_possibles)
-                                            spawn_x = random.randint(zone_choisie[0], zone_choisie[1])
+                                        player.hitbox.x = 400
+                                        player.hitbox.y = 520
+                                        player.x_vel = 0
+                                        player.y_vel = 0
+                                        player.health = player.max_health
+                                        player.inventory.clear()
+                                        player.trash_collected = 0
 
-                                            r_file = random.choice(
-                                                ["tire.png", "glassBottle.png", "cardboard.png", "bottle.png",
-                                                 "trashBag.png"])
-                                            scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7,
-                                                      "bottle.png": 2, "trashBag.png": 3}
-                                            objects.append(Waste(spawn_x, 0, r_file, scales.get(r_file, 3)))
-                                        # ----------------------------
-
-                                    if current_level == 4:
                                         for o in objects[:]:
-                                            # On supprime les blocs du mur de droite
-                                            if isinstance(o,
-                                                          Block) and o.rect.x >= 27 * block_size and o.rect.y < HEIGHT - block_size * 2:
+                                            if isinstance(o, Waste):
                                                 objects.remove(o)
-                            else:
-                                if current_level == 0:
-                                    # TUTO : Afficher l'alerte pendant 2 secondes
-                                    wrong_bin_timer = 120
 
-                                    # On remet directement l'objet dans l'inventaire du joueur
-                                    player.collect_trash(obj, objects)
+                                        if current_level in [1, 2, 3]:
+                                            zones_possibles = [(100, 700), (701, 1300), (1580, 2080), (2081, 2570)]
+                                            for _ in range(3):
+                                                zone_choisie = random.choice(zones_possibles)
+                                                spawn_x = random.randint(zone_choisie[0], zone_choisie[1])
+                                                r_file = random.choice(["tire.png", "glassBottle.png", "cardboard.png", "bottle.png", "trashBag.png"])
+                                                scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
+                                                objects.append(Waste(spawn_x, 0, r_file, scales.get(r_file, 3)))
+
+                                        if current_level == 4:
+                                            for o in objects[:]:
+                                                if isinstance(o, Block) and o.rect.x >= 27 * block_size and o.rect.y < HEIGHT - block_size * 2:
+                                                    objects.remove(o)
                                 else:
-                                    # NORMAL : Mauvais tri = l'eau monte !
-                                    water.up()  # <--- On retire le '80' ici
-                                    if obj in objects:
-                                        objects.remove(obj)
-                            break
+                                    if current_level == 0:
+                                        wrong_bin_timer = 120
+                                        player.collect_trash(obj, objects)
+                                    else:
+                                        water.up()
+                                        if obj in objects:
+                                            objects.remove(obj)
+                                break
 
-        # --- SPAWN DES AVIONS (TOUJOURS ACTIFS COMME OBSTACLES) ---
-        if current_level > 0:
-            avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-            max_planes = {1: 2, 2: 5, 3: 10, 4: 10}.get(current_level, 0)
-            spawn_chance = {1: 100, 2: 50, 3: 20, 4: 20}.get(current_level, 999)
+            # --- SPAWN DES AVIONS ---
+            if current_level > 0:
+                avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
+                max_planes = {1: 2, 2: 5, 3: 10, 4: 10}.get(current_level, 0)
+                spawn_chance = {1: 100, 2: 50, 3: 20, 4: 20}.get(current_level, 999)
 
-            if avions_actifs < max_planes:
-                if random.randint(1, spawn_chance) == 1:
-                    spawn_avion(objects, current_level)
+                if avions_actifs < max_planes:
+                    if random.randint(1, spawn_chance) == 1:
+                        spawn_avion(objects, current_level)
 
         # --- CONDITION DE DÉFAITE ---
         if player.health <= 0:
@@ -1419,41 +1567,46 @@ def main(window, start_level=0):
         if current_level == 4 and player.hitbox.x >= 28 * block_size:
             current_level = 5
             frames_left = level_times.get(current_level, 300) * FPS
-            show_level_transition(window, current_level)
-
+            death_message = "VOUS ÊTES MORT"
             player.health = player.max_health
             player.inventory.clear()
             player.trash_collected = 0
-            player.hitbox.x = 100
-            player.hitbox.y = HEIGHT - block_size * 3
 
-            # --- CRÉATION DE LA NOUVELLE MAP (ARÈNE DU BOSS) ---
-            objects.clear()  # On efface l'ancienne map
+            show_level_transition(window, current_level)
+            pygame.event.clear()  # <-- vide la queue APRES la transition
 
-            # Sol plat
-            boss_floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
-                          range(-10, 35)]
-            boss_bottom = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
-                           range(-10, 35)]
+            objects.clear()
+            # Sol plat de l'arène (sans tour centrale)
+            boss_floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in range(-3, 22)]
+            boss_bottom = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in range(-3, 22)]
 
-            # Murs de l'arène
-            boss_left_wall = [
-                Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(
-                    -3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-            boss_right_wall = [
-                Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0 else Block(
-                    20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            # Quelques plateformes pour rendre l'arène moins vide
+            boss_plateforms = [
+                Platform(200, HEIGHT - block_size * 4),
+                Platform(500, HEIGHT - block_size * 5),
+                Platform(900, HEIGHT - block_size * 4),
+                Platform(1200, HEIGHT - block_size * 5),
+            ]
+
+            # Murs
+            boss_left_wall = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                               else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            boss_right_wall = [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                                else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
 
             objects.extend(boss_floor)
             objects.extend(boss_bottom)
+            objects.extend(boss_plateforms)
             objects.extend(boss_left_wall)
             objects.extend(boss_right_wall)
 
-            # On place le joueur à l'entrée gauche de l'arène
+            # Spawn du boss à droite de l'arène
+            boss = Boss(18 * block_size, HEIGHT - block_size * 4)
+            boss_waste_spawn_timer = 60  # Premier déchet après 1 seconde
+
             player.hitbox.x = 100
             player.hitbox.y = HEIGHT - block_size * 3
 
-            # Reset de la caméra
             offset_x = 0
             scroll = 0
             saved_offset_x = 0
@@ -1461,17 +1614,19 @@ def main(window, start_level=0):
             camera_shifted = False
 
         # --- GESTION DE LA CAMÉRA ---
-        if player.hitbox.x <= -95 and not camera_shifted:
-            saved_offset_x = offset_x
-            saved_scroll = scroll
-            offset_x -= 800
-            scroll -= 800
-            camera_shifted = True
-        elif player.hitbox.x > -95 and camera_shifted:
-            offset_x = saved_offset_x
-            scroll = saved_scroll
-            camera_shifted = False
+        if current_level < 5:
+            if player.hitbox.x <= -95 and not camera_shifted:
+                saved_offset_x = offset_x
+                saved_scroll = scroll
+                offset_x -= 800
+                scroll -= 800
+                camera_shifted = True
+            elif player.hitbox.x > -95 and camera_shifted:
+                offset_x = saved_offset_x
+                scroll = saved_scroll
+                camera_shifted = False
 
+            # La caméra normale qui suit le joueur reste à l'extérieur du "if"
         if not camera_shifted:
             if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                     (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
@@ -1481,18 +1636,16 @@ def main(window, start_level=0):
             if abs(scroll) > WIDTH:
                 scroll = 0
 
-        # --- GESTION DES MESSAGES DU TUTO ---
         if wrong_bin_timer > 0:
             wrong_bin_timer -= 1
         if throw_harder_timer > 0:
             throw_harder_timer -= 1
 
-        # On récupère l'objectif du niveau actuel
         level_goal = level_goals.get(current_level, 999)
 
-        # Dessin global (avec les nouvelles infos du compteur)
-        draw(window, parallax_bg, player, objects, offset_x, frames_left, wrong_bin_timer, throw_harder_timer,
-             total_recycled, level_goal)
+        draw(window, parallax_bg, player, objects, offset_x, frames_left,
+             wrong_bin_timer, throw_harder_timer, total_recycled, level_goal,
+             boss if current_level == 5 else None)
 
     pygame.quit()
     quit()
@@ -1503,11 +1656,7 @@ if __name__ == "__main__":
 
     while jeu_en_cours:
         main_menu(window)
-
-        # On lance toujours au niveau 0 (Tuto)
-        vouloir_rejouer = main(window, start_level=3)
-
-        # Si le joueur ne veut pas rejouer (il a fait Echap), on quitte
+        vouloir_rejouer = main(window, start_level=0)
         if not vouloir_rejouer:
             jeu_en_cours = False
 
