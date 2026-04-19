@@ -913,7 +913,7 @@ class Avion(Object):
         if zone == 0:
             return
 
-        marges_par_niveau = {1: 2, 2: 3, 3: 4}
+        marges_par_niveau = {1: 3, 2: 4, 3: 5}
         marge = marges_par_niveau.get(self.level, 0)
         wastes_on_map = [o for o in objects if isinstance(o, Waste) and not o.collected]
 
@@ -1267,8 +1267,8 @@ def main(window, start_level=0):
     current_level = start_level
     total_recycled = 0
 
-    level_goals = {0: 6, 1: 10, 2: 15, 3: 1, 4: 9999, 5: 9999}
-    level_times = {0: 150, 1: 110, 2: 130, 3: 200, 4: 60, 5: 300}
+    level_goals = {0: 6, 1: 10, 2: 15, 3: 20, 4: 9999, 5: 9999}
+    level_times = {0: 150, 1: 110, 2: 150, 3: 200, 4: 60, 5: 300}
     frames_left = level_times.get(current_level, 60) * FPS
 
     show_level_transition(window, current_level)
@@ -1353,7 +1353,6 @@ def main(window, start_level=0):
     water = Water(HEIGHT - 74, 200, 0.1)
     objects.append(water)
 
-    # Boss (None jusqu'au niveau 5)
     boss = None
 
     offset_x = 0
@@ -1416,9 +1415,6 @@ def main(window, start_level=0):
             "trashBag.png": "black"
         }
 
-        # =====================================================================
-        # NIVEAU 5 : COMBAT DE BOSS
-        # =====================================================================
         if current_level == 5 and boss is not None:
 
             # --- MISE À JOUR DU BOSS ---
@@ -1455,9 +1451,6 @@ def main(window, start_level=0):
                 rejouer = victory_screen(window)
                 return rejouer
 
-        # =====================================================================
-        # NIVEAUX 0-4 : LOGIQUE NORMALE
-        # =====================================================================
         else:
             for obj in objects[:]:
 
@@ -1551,7 +1544,7 @@ def main(window, start_level=0):
             # --- SPAWN DES AVIONS ---
             if current_level > 0:
                 avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-                max_planes = {1: 2, 2: 5, 3: 10, 4: 10}.get(current_level, 0)
+                max_planes = {1: 2, 2: 4, 3: 6, 4: 6}.get(current_level, 0)
                 spawn_chance = {1: 100, 2: 50, 3: 20, 4: 20}.get(current_level, 999)
 
                 if avions_actifs < max_planes:
@@ -1656,7 +1649,7 @@ if __name__ == "__main__":
 
     while jeu_en_cours:
         main_menu(window)
-        vouloir_rejouer = main(window, start_level=0)
+        vouloir_rejouer = main(window, start_level=1)
         if not vouloir_rejouer:
             jeu_en_cours = False
 
