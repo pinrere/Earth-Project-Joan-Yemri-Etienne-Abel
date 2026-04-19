@@ -1423,20 +1423,19 @@ def main(window, start_level=0):
             # --- GESTION DES DÉCHETS (Dégâts et Lancers) ---
             for obj in objects[:]:
                 if isinstance(obj, Waste):
-                    # Gravité et rebonds
                     obj.update(objects)
 
-                    # 1. SI LE DÉCHET VOLE ET TE TOUCHE = DÉGÂTS
+                    # 1. SI LE DÉCHET VOLE ET TOUCHE LE JOUEUR
+                    # AJOUT : On vérifie que 'not obj.is_launched' pour que le joueur soit immunisé à ses propres tirs
                     if obj.rect.colliderect(player.hitbox) and not obj.on_ground and not obj.is_launched:
                         if not player.hit:
                             player.health -= 1
                             player.make_hit()
-                        # Le déchet explose/disparaît quand il te blesse
                         if obj in objects:
                             objects.remove(obj)
                         continue
 
-                    # 2. SI TU AS LANCÉ LE DÉCHET ET QU'IL TOUCHE LE BOSS = DÉGÂTS AU BOSS
+                    # 2. SI LE JOUEUR A LANCÉ LE DÉCHET ET TOUCHE LE BOSS
                     if obj.is_launched and obj.rect.colliderect(boss.hitbox):
                         boss.take_hit()
                         if obj in objects:
@@ -1480,12 +1479,16 @@ def main(window, start_level=0):
                 if isinstance(obj, Waste):
                     obj.update(objects, water=water)
 
-                    if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
+                    # Si le déchet tombe sur le joueur
+                    # AJOUT : On vérifie 'not obj.is_launched'
+                    if obj.rect.colliderect(
+                            player.hitbox) and obj.y_vel > 0 and not obj.on_ground and not obj.is_launched:
                         if current_level > 0:
                             if not player.hit:
                                 player.health -= 1
                                 player.make_hit()
-                            if obj in objects: objects.remove(obj)
+                            if obj in objects:
+                                objects.remove(obj)
                             continue
 
                     if current_level == 0 and obj.on_ground and obj.rect.x <= -130:
