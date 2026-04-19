@@ -393,6 +393,7 @@ class Waste(Object):
         self.pos_x = float(x)
         self.pos_y = float(y)
         self.on_ground = False
+        self.is_launched = False
 
     def hit_vertical(self, objects):
         self.rect.y += self.y_vel
@@ -642,6 +643,7 @@ def handle_move(player, objects, offset_x):
                 last_item_file, scale = player.inventory.pop()
 
                 launched_item = Waste(spawn_x, spawn_y, last_item_file, scale, vel_x=v_x, vel_y=v_y)
+                launched_item.is_launched = True
                 objects.append(launched_item)
 
                 player.trash_collected -= 1
@@ -1104,10 +1106,10 @@ def main(window, start_level=0):
     total_recycled = 0
 
     # Le niveau 4 (traversée) et 5 (boss) n'ont pas d'objectif de tri (donc 9999)
-    level_goals = {0: 6, 1: 10, 2: 15, 3: 20, 4: 9999, 5: 9999}
+    level_goals = {0: 6, 1: 10, 2: 15, 3: 1, 4: 9999, 5: 9999}
 
     # Temps par niveau (60s pour traverser, 300s pour le boss)
-    level_times = {0: 150, 1: 110, 2: 130, 3: 150, 4: 60, 5: 300}
+    level_times = {0: 150, 1: 110, 2: 130, 3: 200, 4: 60, 5: 300}
     frames_left = level_times.get(current_level, 60) * FPS
 
     show_level_transition(window, current_level)
@@ -1339,7 +1341,7 @@ def main(window, start_level=0):
 
                 for other in objects:
                     if isinstance(other, TrashBin):
-                        if obj.rect.colliderect(other.hitbox):
+                        if obj.rect.colliderect(other.hitbox) and obj.is_launched:
                             correct_color = WASTE_TYPES.get(obj.filename)
                             if correct_color == other.color:
                                 # Bon tri
@@ -1354,7 +1356,6 @@ def main(window, start_level=0):
                                     player.hitbox.x = 400
                                     player.hitbox.y = 520
                                     player.x_vel = 0
-                                    player.y_vel = 0
 
                                     player.inventory.clear()
                                     player.trash_collected = 0
@@ -1419,6 +1420,12 @@ def main(window, start_level=0):
             current_level = 5
             frames_left = level_times.get(current_level, 300) * FPS
             show_level_transition(window, current_level)
+
+            player.health = player.max_health
+            player.inventory.clear()
+            player.trash_collected = 0
+            player.hitbox.x = 100
+            player.hitbox.y = HEIGHT - block_size * 3
 
             # --- CRÉATION DE LA NOUVELLE MAP (ARÈNE DU BOSS) ---
             objects.clear()  # On efface l'ancienne map
@@ -1498,7 +1505,7 @@ if __name__ == "__main__":
         main_menu(window)
 
         # On lance toujours au niveau 0 (Tuto)
-        vouloir_rejouer = main(window, start_level=0)
+        vouloir_rejouer = main(window, start_level=3)
 
         # Si le joueur ne veut pas rejouer (il a fait Echap), on quitte
         if not vouloir_rejouer:
