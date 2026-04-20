@@ -1227,7 +1227,6 @@ def game_over_screen(window, message="VOUS ÊTES MORT"):
 
 
 def victory_screen(window):
-    """Écran de victoire après avoir vaincu le boss."""
     clock = pygame.time.Clock()
 
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -1532,7 +1531,7 @@ def main(window, start_level=0):
 
                                         if current_level == 4:
                                             for o in objects[:]:
-                                                if isinstance(o, Block) and o.rect.x >= 27 * block_size and o.rect.y < HEIGHT - block_size * 2:
+                                                if isinstance(o, Block) and o.rect.x >= 27 * block_size and o.rect.y == HEIGHT - block_size * 5:
                                                     objects.remove(o)
                                 else:
                                     if current_level == 0:
@@ -1585,16 +1584,23 @@ def main(window, start_level=0):
             ]
 
             # Murs
-            boss_left_wall = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                               else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-            boss_right_wall = [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                                else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            # Murs à gauche (3 colonnes supplémentaires vers la gauche)
+            for offset in range(1, 3):  # offset va de 1 à 3
+                extra_left_wall = [
+                    Block((-3 - offset) * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                    else Block((-3 - offset) * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+                    for i in range(-5, 9)
+                ]
+                objects.extend(extra_left_wall)
 
-            objects.extend(boss_floor)
-            objects.extend(boss_bottom)
-            objects.extend(boss_plateforms)
-            objects.extend(boss_left_wall)
-            objects.extend(boss_right_wall)
+            # Murs à droite (3 colonnes supplémentaires vers la droite)
+            for offset in range(1, 3):  # offset va de 1 à 3
+                extra_right_wall = [
+                    Block((20 + offset) * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                    else Block((20 + offset) * block_size, i * block_size, block_size, "dirtGrassBlock.png")
+                    for i in range(-5, 9)
+                ]
+                objects.extend(extra_right_wall)
 
             # Spawn du boss à droite de l'arène
             boss = Boss(18 * block_size, HEIGHT - block_size * 4)
@@ -1652,7 +1658,7 @@ if __name__ == "__main__":
 
     while jeu_en_cours:
         main_menu(window)
-        vouloir_rejouer = main(window, start_level=1)
+        vouloir_rejouer = main(window, start_level=4)
         if not vouloir_rejouer:
             jeu_en_cours = False
 
