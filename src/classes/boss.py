@@ -131,21 +131,28 @@ class Boss:
 
         # PARAMÈTRES PAR DÉFAUT (Normal)
         nb_dechets = 1
-        flight_time = 45.0  # Temps de vol en frames (plus c'est grand, plus c'est lent et en cloche)
-        spread = 1.0  # Éparpillement
+        flight_time = 45.0
+        spread = 1.0
+        special_straight_shot = False  # Indicateur pour le tir surpuissant
 
         # CHANGEMENT DE PATTERN SELON LES PV
         if self.hp <= 3:
-            # PHASE 3 : Panique (Shotgun)
-            nb_dechets = 4
-            flight_time = 32.0  # Rapide
+            # PHASE 3 : Panique (Shotgun + Tir Rapide)
+            nb_dechets = 3
+            flight_time = 32.0
             spread = 4.0
+            # Très grande chance de faire un tir droit additionnel
+            if random.random() < 0.7:
+                special_straight_shot = True
 
         elif self.hp <= 5:
             # PHASE 2 : Rage (Sniper / Tir très rapide et tendu)
             nb_dechets = 2
-            flight_time = 22.0  # Très rapide !
+            flight_time = 22.0
             spread = 1.5
+            # 50% de chance de remplacer un des tirs normaux par un tir droit puissant
+            if random.random() < 0.5:
+                special_straight_shot = True
 
         elif self.hp <= 8:
             # PHASE 1.5 : S'énerve doucement
@@ -153,28 +160,44 @@ class Boss:
             flight_time = 40.0
             spread = 1.5
 
-        # --- CALCUL BALISTIQUE INTELLIGENT ---
-        # On calcule les vitesses exactes (X et Y) pour que le déchet retombe PILE sur le joueur
-        gravity = Waste.GRAVITY  # (0.8 dans ta classe Waste)
+        # --- CALCUL BALISTIQUE STANDARD ---
+        gravity = Waste.GRAVITY
 
         base_vx = dx / flight_time
         base_vy = (dy / flight_time) - (0.5 * gravity * flight_time)
 
-        # On limite les vitesses extrêmes pour éviter les bugs si le joueur est collé au boss
         base_vx = max(min(base_vx, 25), -25)
-        base_vy = max(min(base_vy, 10), -35)  # Max -35 vers le haut
+        base_vy = max(min(base_vy, 10), -35)
 
-        # CRÉATION DES DÉCHETS
+        # CRÉATION DES DÉCHETS STANDARDS
         for _ in range(nb_dechets):
             r_file = random.choice(["tire.png", "glassBottle.png", "cardboard.png", "bottle.png", "trashBag.png"])
             scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
 
-            # On applique l'éparpillement (spread)
             vx_final = base_vx + random.uniform(-spread, spread)
             vy_final = base_vy + random.uniform(-spread, spread / 2)
 
             trash = Waste(spawn_x, spawn_y, r_file, scale=scales.get(r_file, 3), vel_x=vx_final, vel_y=vy_final)
             objects.append(trash)
+
+        # --- LE TIR PUISSANT EN LIGNE DROITE ---
+        if special_straight_shot:
+            r_file = "tire.png"  # Le pneu est parfait pour un tir lourd et rapide
+            scale = 3
+
+            # Temps de vol extrêmement court pour simuler une ligne droite
+            fast_flight_time = 12.0
+
+            # Recalcul balistique pour le tir tendu
+            straight_vx = dx / fast_flight_time
+            straight_vy = (dy / fast_flight_time) - (0.5 * gravity * fast_flight_time)
+
+            # On autorise des vitesses beaucoup plus élevées pour ce tir
+            straight_vx = max(min(straight_vx, 40), -40)
+            straight_vy = max(min(straight_vy, 10), -20)
+
+            fast_trash = Waste(spawn_x, spawn_y, r_file, scale=scale, vel_x=straight_vx, vel_y=straight_vy)
+            objects.append(fast_trash)
 
     def _animate(self, anim_name):
         # Cherche la clé qui contient anim_name et la bonne direction
