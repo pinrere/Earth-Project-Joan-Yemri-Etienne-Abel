@@ -61,17 +61,17 @@ def main(window, start_level=0):
     floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
              range(-10, 23) if i not in [3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]]
     floor += [Block(i * block_size, HEIGHT - block_size * 4, block_size, "dirtGrassBlock.png") for i in
-              range(14, 27) if i not in [16, 17, 18, 21, 22, 23, 24]]
+              range(14, 31) if i not in [16, 17, 18, 21, 22, 23, 24]]
     floor += [Block(i * block_size, HEIGHT - block_size, block_size, "dirtGrassBlock.png") for i in
               range(9, 25) if i not in [14, 15, 16, 17, 18, 19, 20, 21, 22]]
     floor += [Block(6 * block_size, HEIGHT - block_size * 6, block_size, "dirtGrassBlock.png")]
 
     bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
-                    range(-10, 27) if i not in [3, 4, 5, 9, 10, 11, 12, 13, 16, 17, 18, 23, 24]]
+                    range(-10, 31) if i not in [3, 4, 5, 9, 10, 11, 12, 13, 16, 17, 18, 23, 24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtBlock.png") for i in
-                     range(14, 27) if i not in [16, 17, 18, 21, 22, 23, 24]]
+                     range(14, 31) if i not in [16, 17, 18, 21, 22, 23, 24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 3, block_size, "dirtBlock.png") for i in
-                     range(14, 27) if i not in [16, 17, 18, 21, 22, 23, 24]]
+                     range(14, 31) if i not in [16, 17, 18, 21, 22, 23, 24]]
     bottom_floor += [Block(6 * block_size, HEIGHT - block_size * 5, block_size, "dirtBlock.png")]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 7, block_size, "dirtBlock.png") for i in range(14, 16)]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 8, block_size, "dirtBlock.png") for i in range(14, 16)]
@@ -355,13 +355,15 @@ def main(window, start_level=0):
             boss_left_wall = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
                                else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
             boss_left_left_wall = [Block(-4 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                              else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in
-                              range(-5, 9)]
+                              else Block(-4 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            boss_left_left_left_wall = [Block(-5 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                                   else Block(-5 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
             boss_right_wall = [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
                                 else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
             boss_right_right_wall = [Block(21 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                               else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in
-                               range(-5, 9)]
+                               else Block(21 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            boss_right_right_right_wall = [Block(22 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                                     else Block(22 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
 
             objects.extend(boss_floor)
             objects.extend(boss_bottom)
@@ -370,6 +372,9 @@ def main(window, start_level=0):
             objects.extend(boss_right_wall)
             objects.extend(boss_left_left_wall)
             objects.extend(boss_right_right_wall)
+            objects.extend(boss_left_left_left_wall)
+            objects.extend(boss_right_right_right_wall)
+
 
             # Spawn du boss à droite de l'arène
             boss = Boss(18 * block_size, HEIGHT - block_size * 4)
@@ -427,7 +432,7 @@ if __name__ == "__main__":
 
     while jeu_en_cours:
         main_menu(window)
-        vouloir_rejouer = main(window, start_level=3)
+        vouloir_rejouer = main(window, start_level=1)
         if not vouloir_rejouer:
             jeu_en_cours = False
 
