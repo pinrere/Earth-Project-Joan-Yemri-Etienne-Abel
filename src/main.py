@@ -432,7 +432,7 @@ if __name__ == "__main__":
 
     while jeu_en_cours:
         main_menu(window)
-        vouloir_rejouer = main(window, start_level=3)
+        vouloir_rejouer = main(window, start_level=0)
         if not vouloir_rejouer:
             jeu_en_cours = False
 
