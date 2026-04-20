@@ -1584,14 +1584,22 @@ def main(window, start_level=0):
             # Murs
             boss_left_wall = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
                                else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            boss_left_left_wall = [Block(-4 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                              else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in
+                              range(-5, 9)]
             boss_right_wall = [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
                                 else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            boss_right_right_wall = [Block(21 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                               else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in
+                               range(-5, 9)]
 
             objects.extend(boss_floor)
             objects.extend(boss_bottom)
             objects.extend(boss_plateforms)
             objects.extend(boss_left_wall)
             objects.extend(boss_right_wall)
+            objects.extend(boss_left_left_wall)
+            objects.extend(boss_right_right_wall)
 
             # Spawn du boss à droite de l'arène
             boss = Boss(18 * block_size, HEIGHT - block_size * 4)
