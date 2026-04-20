@@ -1,5 +1,6 @@
 import pygame
-from os.path import join
+from os import listdir
+from os.path import join, isfile
 from src.fonctions.flip import flip
 
 def load_sprite_sheets(dir1, dir2, width, height, direction=False):
