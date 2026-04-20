@@ -1227,6 +1227,7 @@ def game_over_screen(window, message="VOUS ÊTES MORT"):
 
 
 def victory_screen(window):
+    """Écran de victoire après avoir vaincu le boss."""
     clock = pygame.time.Clock()
 
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -1266,7 +1267,7 @@ def main(window, start_level=0):
     current_level = start_level
     total_recycled = 0
 
-    level_goals = {0: 6, 1: 10, 2: 15, 3: 20, 4: 9999, 5: 9999}
+    level_goals = {0: 6, 1: 10, 2: 15, 3: 1, 4: 9999, 5: 9999}
     level_times = {0: 150, 1: 110, 2: 150, 3: 200, 4: 60, 5: 300}
     frames_left = level_times.get(current_level, 60) * FPS
 
@@ -1422,19 +1423,20 @@ def main(window, start_level=0):
             # --- GESTION DES DÉCHETS (Dégâts et Lancers) ---
             for obj in objects[:]:
                 if isinstance(obj, Waste):
+                    # Gravité et rebonds
                     obj.update(objects)
 
-                    # 1. SI LE DÉCHET VOLE ET TOUCHE LE JOUEUR
-                    # AJOUT : On vérifie que 'not obj.is_launched' pour que le joueur soit immunisé à ses propres tirs
+                    # 1. SI LE DÉCHET VOLE ET TE TOUCHE = DÉGÂTS
                     if obj.rect.colliderect(player.hitbox) and not obj.on_ground and not obj.is_launched:
                         if not player.hit:
                             player.health -= 1
                             player.make_hit()
+                        # Le déchet explose/disparaît quand il te blesse
                         if obj in objects:
                             objects.remove(obj)
                         continue
 
-                    # 2. SI LE JOUEUR A LANCÉ LE DÉCHET ET TOUCHE LE BOSS
+                    # 2. SI TU AS LANCÉ LE DÉCHET ET QU'IL TOUCHE LE BOSS = DÉGÂTS AU BOSS
                     if obj.is_launched and obj.rect.colliderect(boss.hitbox):
                         boss.take_hit()
                         if obj in objects:
@@ -1478,16 +1480,12 @@ def main(window, start_level=0):
                 if isinstance(obj, Waste):
                     obj.update(objects, water=water)
 
-                    # Si le déchet tombe sur le joueur
-                    # AJOUT : On vérifie 'not obj.is_launched'
-                    if obj.rect.colliderect(
-                            player.hitbox) and obj.y_vel > 0 and not obj.on_ground and not obj.is_launched:
+                    if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
                         if current_level > 0:
                             if not player.hit:
                                 player.health -= 1
                                 player.make_hit()
-                            if obj in objects:
-                                objects.remove(obj)
+                            if obj in objects: objects.remove(obj)
                             continue
 
                     if current_level == 0 and obj.on_ground and obj.rect.x <= -130:
@@ -1531,7 +1529,7 @@ def main(window, start_level=0):
 
                                         if current_level == 4:
                                             for o in objects[:]:
-                                                if isinstance(o, Block) and o.rect.x >= 27 * block_size and o.rect.y == HEIGHT - block_size * 5:
+                                                if isinstance(o, Block) and o.rect.x >= 27 * block_size and o.rect.y < HEIGHT - block_size * 4:
                                                     objects.remove(o)
                                 else:
                                     if current_level == 0:
@@ -1584,23 +1582,16 @@ def main(window, start_level=0):
             ]
 
             # Murs
-            # Murs à gauche (3 colonnes supplémentaires vers la gauche)
-            for offset in range(1, 3):  # offset va de 1 à 3
-                extra_left_wall = [
-                    Block((-3 - offset) * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                    else Block((-3 - offset) * block_size, i * block_size, block_size, "dirtGrassBlock.png")
-                    for i in range(-5, 9)
-                ]
-                objects.extend(extra_left_wall)
+            boss_left_wall = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                               else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
+            boss_right_wall = [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
+                                else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
 
-            # Murs à droite (3 colonnes supplémentaires vers la droite)
-            for offset in range(1, 3):  # offset va de 1 à 3
-                extra_right_wall = [
-                    Block((20 + offset) * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                    else Block((20 + offset) * block_size, i * block_size, block_size, "dirtGrassBlock.png")
-                    for i in range(-5, 9)
-                ]
-                objects.extend(extra_right_wall)
+            objects.extend(boss_floor)
+            objects.extend(boss_bottom)
+            objects.extend(boss_plateforms)
+            objects.extend(boss_left_wall)
+            objects.extend(boss_right_wall)
 
             # Spawn du boss à droite de l'arène
             boss = Boss(18 * block_size, HEIGHT - block_size * 4)
@@ -1658,7 +1649,7 @@ if __name__ == "__main__":
 
     while jeu_en_cours:
         main_menu(window)
-        vouloir_rejouer = main(window, start_level=4)
+        vouloir_rejouer = main(window, start_level=3)
         if not vouloir_rejouer:
             jeu_en_cours = False
 
