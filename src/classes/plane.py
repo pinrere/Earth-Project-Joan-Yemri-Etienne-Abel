@@ -97,7 +97,7 @@ class Avion(Object):
 
         test_rect = pygame.Rect(trash_x, trash_y, 30, 30)
         for obj in objects:
-            if isinstance(obj, (Block, Bridge, Platform)) and test_rect.colliderect(obj.rect):
+            if obj.__class__.__name__ in ["Block", "Bridge", "Platform"] and test_rect.colliderect(obj.rect):
                 return
 
         random_file = random.choice(["tire.png", "glassBottle.png", "cardboard.png", "bottle.png", "trashBag.png"])

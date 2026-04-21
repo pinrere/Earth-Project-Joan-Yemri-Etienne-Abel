@@ -197,7 +197,7 @@ def main(window, start_level=0):
                     obj.update(objects)
 
                     # 1. SI LE DÉCHET VOLE ET TE TOUCHE = DÉGÂTS
-                    if obj.rect.colliderect(player.hitbox) and not obj.on_ground and not obj.is_launched:
+                    if obj.rect.colliderect(player.hitbox) and obj.is_dangerous:
                         if not player.hit:
                             player.health -= 1
                             player.make_hit()
@@ -250,7 +250,7 @@ def main(window, start_level=0):
                 if isinstance(obj, Waste):
                     obj.update(objects, water=water)
 
-                    if obj.rect.colliderect(player.hitbox) and obj.y_vel > 0 and not obj.on_ground:
+                    if obj.rect.colliderect(player.hitbox) and obj.is_dangerous:
                         if current_level > 0:
                             if not player.hit:
                                 player.health -= 1
@@ -433,7 +433,7 @@ if __name__ == "__main__":
 
     while jeu_en_cours:
         main_menu(window)
-        vouloir_rejouer = main(window, start_level=0)
+        vouloir_rejouer = main(window, start_level=3)
         if not vouloir_rejouer:
             jeu_en_cours = False
 

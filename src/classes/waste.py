@@ -31,6 +31,7 @@ class Waste(Object):
         self.pos_y = float(y)
         self.on_ground = False
         self.is_launched = False
+        self.is_dangerous = True
 
     def update(self, objects, water=None):
         if not self.on_ground:
@@ -50,7 +51,7 @@ class Waste(Object):
         self.rect.x = int(self.pos_x)
 
         for obj in objects:
-            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
+            if obj.__class__.__name__ in ["Block", "Bridge", "Platform"] and self.rect.colliderect(obj.rect):
                 if self.x_vel > 0:
                     self.rect.right = obj.rect.left
                 elif self.x_vel < 0:
@@ -64,7 +65,7 @@ class Waste(Object):
         self.on_ground = False
 
         for obj in objects:
-            if (isinstance(obj, Block) or isinstance(obj, Bridge) or isinstance(obj, Platform)) and self.rect.colliderect(obj.rect):
+            if obj.__class__.__name__ in ["Block", "Bridge", "Platform"] and self.rect.colliderect(obj.rect):
                 if self.y_vel > 0:
                     self.rect.bottom = obj.rect.top
                     self.pos_y = self.rect.y
@@ -81,4 +82,6 @@ class Waste(Object):
 
         if self.on_ground:
             self.is_launched = False
+            self.is_dangerous = False
             self.x_vel *= 0.9
+

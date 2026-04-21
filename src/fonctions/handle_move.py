@@ -47,6 +47,7 @@ def handle_move(player, objects, offset_x):
 
                 launched_item = Waste(spawn_x, spawn_y, last_item_file, scale, vel_x=v_x, vel_y=v_y)
                 launched_item.is_launched = True
+                launched_item.is_dangerous = False
                 objects.append(launched_item)
 
                 player.trash_collected -= 1

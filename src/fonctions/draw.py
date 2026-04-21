@@ -1,4 +1,5 @@
 import pygame
+import math
 from src.classes.water import Water
 from src.classes.shadowblock import ShadowBlock
 
@@ -23,7 +24,6 @@ def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_
             continue
         obj.draw(window, offset_x)
 
-    # Dessin du boss
     if boss and boss.alive:
         boss.draw(window, offset_x)
 
@@ -31,6 +31,27 @@ def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_
     player.draw_health_bar(window, offset_x)
     player.draw_trajectory(window, offset_x)
     player.draw_inventory(window)
+
+    if boss is None:
+        water_obj = next((o for o in objects if o.__class__.__name__ == "Water"), None)
+        mistakes = water_obj.mistakes if water_obj else 0
+
+        font_water = pygame.font.SysFont("arial", 28, bold=True)
+
+        if mistakes <= 2:
+            color_water = (100, 255, 100)
+        elif mistakes == 3:
+            color_water = (255, 165, 0)
+        else:
+            clignotement = 150 + abs(math.sin(pygame.time.get_ticks() / 150.0)) * 105
+            color_water = (int(clignotement), 50, 50)
+
+        texte_water = font_water.render(f"Niveau toxique : {min(mistakes, 5)} / 5", True, color_water)
+
+        bg_water = pygame.Surface((texte_water.get_width() + 20, texte_water.get_height() + 10), pygame.SRCALPHA)
+        bg_water.fill((0, 0, 0, 150))
+        window.blit(bg_water, (10, 65))
+        window.blit(texte_water, (20, 70))
 
     # --- TIMER ---
     font_timer = pygame.font.SysFont("arial", 40, bold=True)
