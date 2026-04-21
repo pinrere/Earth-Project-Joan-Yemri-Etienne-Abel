@@ -170,7 +170,7 @@ def main(window, start_level=0):
         handle_move(player, objects, offset_x)
         player.loop(FPS)
 
-        if player.hitbox.colliderect(water.rect):
+        if player.hitbox.bottom >= water.rect.y + 10:
             player.health = 0
             player.y_vel = 0
             death_message = "L'océan a repris ses droits..."
@@ -226,7 +226,7 @@ def main(window, start_level=0):
 
                 if isinstance(obj, Water):
                     obj.update()
-                    if player.hitbox.colliderect(obj.rect):
+                    if player.hitbox.bottom >= obj.rect.y + 10:
                         player.health = 0
                         death_message = "Vous avez noyé votre planète..."
 
@@ -306,7 +306,8 @@ def main(window, start_level=0):
                                         wrong_bin_timer = 120
                                         player.collect_trash(obj, objects)
                                     else:
-                                        water.up()
+                                        if current_level >= 1:
+                                            water.up()
                                         if obj in objects:
                                             objects.remove(obj)
                                 break
