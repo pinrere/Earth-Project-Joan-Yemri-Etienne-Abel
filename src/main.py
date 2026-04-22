@@ -147,9 +147,8 @@ def main(window, start_level=0, loop_count = 0):
     wrong_bin_timer = 0
     throw_harder_timer = 0
 
-    # Timer spawn déchets boss
     boss_waste_spawn_timer = 0
-    BOSS_WASTE_SPAWN_COOLDOWN = 180  # 3 secondes
+    BOSS_WASTE_SPAWN_COOLDOWN = 180
 
     while run:
         clock.tick(FPS)
@@ -176,18 +175,8 @@ def main(window, start_level=0, loop_count = 0):
             choix_niveau = level_selection_menu(window)
 
             if choix_niveau is not None:
-                current_level = choix_niveau
-                reset_level_state(player, water, current_level, HEIGHT)
-                frames_left = level_times.get(current_level, 60) * FPS
-                show_level_transition(window, current_level, loop_count, parallax_bg)
 
-                if current_level == 4:
-                    boss = None
-
-                if current_level == 5:
-                    player.hitbox.x = 200
-                    player.hitbox.y = HEIGHT - block_size * 3
-                    boss = None
+                return main(window, start_level=choix_niveau, loop_count=loop_count)
 
             paused = False
             continue
@@ -217,18 +206,15 @@ def main(window, start_level=0, loop_count = 0):
 
         if current_level == 5 and boss is not None:
 
-            # --- MISE À JOUR DU BOSS ---
             shake_request = boss.update(player, objects)
             if shake_request > 0:
                 shake_timer = shake_request
 
-            # --- GESTION DES DÉCHETS (Dégâts et Lancers) ---
             for obj in objects[:]:
                 if isinstance(obj, Waste):
-                    # Gravité et rebonds
+
                     obj.update(objects)
 
-                    # 1. SI LE DÉCHET VOLE ET TE TOUCHE = DÉGÂTS
                     if obj.rect.colliderect(player.hitbox) and obj.is_dangerous:
                         if not player.hit:
                             player.health -= 1
@@ -363,14 +349,6 @@ def main(window, start_level=0, loop_count = 0):
                     if random.randint(1, spawn_chance) == 1:
                         spawn_avion(objects, current_level)
 
-                # --- LOGIQUE DE MORT ---
-            if player.health <= 0:
-                rejouer = game_over_screen(window)
-                if rejouer:
-                    return "REPLAY", 0  # On recommence tout
-                else:
-                    return "QUIT", 0
-
                 # --- TRANSITION NIVEAU 4 -> 5 ---
             if current_level == 4:
                 for o in objects[:]:
@@ -385,18 +363,31 @@ def main(window, start_level=0, loop_count = 0):
                 # --- GÉNÉRATION ARÈNE BOSS ---
             if current_level == 5 and boss is None:
                 player.health = player.max_health
+                # 1. On nettoie tout
                 for o in objects[:]:
-                    if not isinstance(o, Water): objects.remove(o)
+                    if not isinstance(o, Water):
+                        objects.remove(o)
+
+                # 2. On crée les blocs
                 boss_floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
                               range(-3, 22)]
                 boss_bottom = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
                                range(-3, 22)]
                 boss_plateforms = [Platform(200, HEIGHT - block_size * 4), Platform(500, HEIGHT - block_size * 5),
                                    Platform(900, HEIGHT - block_size * 4), Platform(1200, HEIGHT - block_size * 5)]
-                boss_walls = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") for i in range(-5, 9)]
-                boss_walls += [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") for i in
-                               range(-5, 9)]
+
+                boss_walls = []
+                for x_offset in [-5, -4, -3]:
+                    boss_walls += [Block(x_offset * block_size, i * block_size, block_size, "dirtBlock.png") for i in
+                                   range(-10, 10)]
+
+                for x_offset in [21, 22, 23]:
+                    boss_walls += [Block(x_offset * block_size, i * block_size, block_size, "dirtBlock.png") for i in
+                                   range(-10, 10)]
+
                 objects.extend(boss_floor + boss_bottom + boss_plateforms + boss_walls)
+
+                # 4. On crée le boss
                 boss = Boss(10 * block_size, -800)
                 player.hitbox.x, player.hitbox.y = 200, HEIGHT - block_size * 3
                 offset_x, camera_shifted = 0, False
@@ -430,6 +421,13 @@ def main(window, start_level=0, loop_count = 0):
         for obj in objects[:]:
             if obj.__class__.__name__ == "Waste" and obj.rect.y > HEIGHT + 200:
                 objects.remove(obj)
+
+        if player.health <= 0:
+            rejouer = game_over_screen(window)
+            if rejouer:
+                return "REPLAY", 0  # On recommence tout
+            else:
+                return "QUIT", 0
 
         # 1. On dessine TOUT le jeu sur une "Surface" temporaire
         temp_surface = pygame.Surface((WIDTH, HEIGHT))
