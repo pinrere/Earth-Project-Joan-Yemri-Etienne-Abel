@@ -389,7 +389,6 @@ def main(window, start_level=0):
             saved_scroll = 0
             camera_shifted = False
 
-        # --- GESTION DE LA CAMÉRA ---
         if current_level < 5:
             if player.hitbox.x <= -95 and not camera_shifted:
                 saved_offset_x = offset_x
