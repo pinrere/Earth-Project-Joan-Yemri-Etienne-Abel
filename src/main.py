@@ -315,8 +315,8 @@ def main(window, start_level=0):
             # --- SPAWN DES AVIONS ---
             if current_level > 0:
                 avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-                max_planes = {1: 2, 2: 4, 3: 6, 4: 6}.get(current_level, 0)
-                spawn_chance = {1: 100, 2: 50, 3: 20, 4: 20}.get(current_level, 999)
+                max_planes = {1: 2, 2: 3, 3: 4, 4: 8}.get(current_level, 0)
+                spawn_chance = {1: 100, 2: 50, 3: 20, 4: 10}.get(current_level, 999)
 
                 if avions_actifs < max_planes:
                     if random.randint(1, spawn_chance) == 1:
@@ -324,8 +324,7 @@ def main(window, start_level=0):
 
         # --- CONDITION DE DÉFAITE ---
         if player.health <= 0:
-            rejouer = game_over_screen(window, message=death_message)
-            return rejouer
+            player.health = player.max_health
 
         # --- PASSAGE VERS L'ARÈNE DU BOSS (NIVEAU 5) ---
         if current_level == 4 and player.hitbox.x >= 28 * block_size:
@@ -390,7 +389,6 @@ def main(window, start_level=0):
             saved_scroll = 0
             camera_shifted = False
 
-        # --- GESTION DE LA CAMÉRA ---
         if current_level < 5:
             if player.hitbox.x <= -95 and not camera_shifted:
                 saved_offset_x = offset_x

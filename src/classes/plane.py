@@ -72,12 +72,11 @@ class Avion(Object):
         if zone == 0:
             return
 
-        marges_par_niveau = {1: 3, 2: 4, 3: 5}
+        marges_par_niveau = {1: 3, 2: 6, 3: 9}
         marge = marges_par_niveau.get(self.level, 0)
         wastes_on_map = [o for o in objects if isinstance(o, Waste) and not o.collected]
 
-        if len(wastes_on_map) >= 6:
-            return
+
 
         total_existing = len(wastes_on_map) + player_trash_collected + total_recycled
         if total_existing >= (level_goal + marge):

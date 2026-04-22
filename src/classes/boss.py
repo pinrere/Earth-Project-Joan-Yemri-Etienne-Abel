@@ -13,8 +13,8 @@ class Boss:
     ANIMATION_DELAY = 6
     MAX_HP = 10
     STOP_DISTANCE = 350   # Distance à laquelle il s'arrête pour tirer
-    WALK_SPEED = 2
-    WALK_SPEED_RAGE = 4
+    WALK_SPEED = 3
+    WALK_SPEED_RAGE = 6
 
     def __init__(self, x, y):
         self.sprites = {}
@@ -26,7 +26,7 @@ class Boss:
             frames = []
             for f in files:
                 img = pygame.image.load(join(folder_path, f)).convert_alpha()
-                img = pygame.transform.scale_by(img, 3)
+                img = pygame.transform.scale_by(img, 4)
                 frames.append(img)
 
             # Version gauche et droite
@@ -212,7 +212,7 @@ class Boss:
     def draw(self, win, offset_x):
         # Sprite
         draw_x = self.hitbox.x - offset_x - self.hitbox.width // 2
-        draw_y = self.hitbox.y + 50
+        draw_y = self.hitbox.y + 67
         win.blit(self.sprite, (draw_x, draw_y))
         # Barre de vie
         self._draw_health_bar(win)
