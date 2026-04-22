@@ -15,8 +15,8 @@ def victory_screen(window):
     font_sous = pygame.font.SysFont('Arial', 40)
     font_btn = pygame.font.SysFont('Arial', 35)
 
-    titre = font_titre.render("VOUS AVEZ SAUVÉ LA PLANÈTE !", True, (100, 255, 100))
-    sous = font_sous.render("Le PDG de la pollution a été vaincu grâce à vous.", True, (200, 255, 200))
+    titre = font_titre.render("L'USINE EST DÉTRUITE !", True, (100, 255, 100))
+    sous = font_sous.render("La nature reprend enfin ses droits...", True, (200, 255, 200))
     btn = font_btn.render("ESPACE pour rejouer  |  ECHAP pour quitter", True, (255, 255, 255))
 
     window.blit(titre, titre.get_rect(center=(WIDTH // 2, HEIGHT // 3)))

@@ -36,6 +36,7 @@ def main(window, start_level=0):
     clock = pygame.time.Clock()
     current_level = start_level
     total_recycled = 0
+    shake_timer = 0
 
     level_goals = {0: 6, 1: 10, 2: 15, 3: 1, 4: 9999, 5: 9999}
     level_times = {0: 150, 1: 110, 2: 150, 3: 200, 4: 60, 5: 300}
@@ -188,7 +189,9 @@ def main(window, start_level=0):
         if current_level == 5 and boss is not None:
 
             # --- MISE À JOUR DU BOSS ---
-            boss.update(player, objects)
+            shake_request = boss.update(player, objects)
+            if shake_request > 0:
+                shake_timer = shake_request
 
             # --- GESTION DES DÉCHETS (Dégâts et Lancers) ---
             for obj in objects[:]:
@@ -375,9 +378,8 @@ def main(window, start_level=0):
             objects.extend(boss_left_left_left_wall)
             objects.extend(boss_right_right_right_wall)
 
-
-            # Spawn du boss à droite de l'arène
-            boss = Boss(18 * block_size, HEIGHT - block_size * 4)
+            # NOUVEAU : Spawn du boss TRÈS HAUT dans le ciel (-800)
+            boss = Boss(10 * block_size, -800)
             boss_waste_spawn_timer = 60  # Premier déchet après 1 seconde
 
             player.hitbox.x = 100
@@ -401,7 +403,6 @@ def main(window, start_level=0):
                 scroll = saved_scroll
                 camera_shifted = False
 
-            # La caméra normale qui suit le joueur reste à l'extérieur du "if"
         if not camera_shifted:
             if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                     (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
@@ -418,13 +419,34 @@ def main(window, start_level=0):
 
         level_goal = level_goals.get(current_level, 999)
 
-        draw(window, parallax_bg, player, objects, offset_x, frames_left,
+        # Nettoyeur anti-lag pour les déchets perdus
+        for obj in objects[:]:
+            if obj.__class__.__name__ == "Waste" and obj.rect.y > HEIGHT + 200:
+                objects.remove(obj)
+
+        # 1. On dessine TOUT le jeu sur une "Surface" temporaire
+        temp_surface = pygame.Surface((WIDTH, HEIGHT))
+        parallax_bg.window = temp_surface
+        draw(temp_surface, parallax_bg, player, objects, offset_x, frames_left,
              wrong_bin_timer, throw_harder_timer, total_recycled, level_goal,
              boss if current_level == 5 else None)
 
+        # 2. Si ça tremble, on décale l'image aléatoirement
+        if shake_timer > 0:
+            shake_timer -= 1
+            intensity = 15 if (boss and boss.state == "dying") else 25
+            dx = random.randint(-intensity, intensity)
+            dy = random.randint(-intensity, intensity)
+            window.blit(temp_surface, (dx, dy))
+        else:
+            # Sinon on affiche normalement
+            window.blit(temp_surface, (0, 0))
+
+        # 3. On met l'écran à jour une seule fois ici !
+        pygame.display.update()
+
     pygame.quit()
     quit()
-
 
 if __name__ == "__main__":
     jeu_en_cours = True

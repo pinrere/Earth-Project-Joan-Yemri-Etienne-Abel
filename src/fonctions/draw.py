@@ -87,5 +87,3 @@ def draw(window, bg_parallax, player, objects, offset_x, frames_left, wrong_bin_
         y_pos = HEIGHT // 3 + 80
         window.blit(bg_alerte, (x_pos - 20, y_pos - 10))
         window.blit(texte_alerte, (x_pos, y_pos))
-
-    pygame.display.update()

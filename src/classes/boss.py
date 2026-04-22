@@ -7,12 +7,13 @@ from src.classes.waste import Waste
 
 WIDTH, HEIGHT = 1400, 800
 
+
 class Boss:
     """Le boss final : PDG de la pollution."""
 
     ANIMATION_DELAY = 6
     MAX_HP = 10
-    STOP_DISTANCE = 350   # Distance à laquelle il s'arrête pour tirer
+    STOP_DISTANCE = 350  # Distance à laquelle il s'arrête pour tirer
     WALK_SPEED = 3
     WALK_SPEED_RAGE = 6
 
@@ -43,11 +44,13 @@ class Boss:
         self.animation_count = 0
         self.current_anim = "player-stand"
 
-        # IA
-        self.state = "walk"
+        # --- NOUVEAU : États d'apparition et de mort ---
+        self.state = "spawning"
+        self.death_timer = 300  # L'explosion va durer environ 2.5 secondes
+
         self.hurt_timer = 0
         self.shoot_timer = 0
-        self.shoot_anim_timer = 0  # NOUVEAU : Pour gérer la durée de l'animation de tir
+        self.shoot_anim_timer = 0
         self.shoot_cooldown = 120
         self.alive = True
 
@@ -59,23 +62,60 @@ class Boss:
 
     def take_hit(self):
         """Appelé quand un déchet touche le boss."""
-        if self.state == "hurt":
-            return  # Invincible pendant l'animation hurt
+        # Invincible pendant l'animation hurt, l'apparition ou la mort
+        if self.state in ["hurt", "spawning", "dying"]:
+            return
+
         self.hp -= 1
         self.state = "hurt"
         self.hurt_timer = 40
         self.animation_count = 0
+
         if self.hp <= 0:
-            self.alive = False
+            self.state = "dying"  # Déclenche l'explosion au lieu de mourir direct
 
     def update(self, player, objects):
+        trigger_shake = 0  # Permet de dire à la caméra de trembler
+
+        # --- CINÉMATIQUE D'APPARITION (Tombe du ciel) ---
+        if self.state == "spawning":
+            self.hitbox.y += 25  # Il tombe très vite !
+            self._animate("player-stand")
+
+            # Quand il touche le sol...
+            for obj in objects:
+                if obj.__class__.__name__ in ["Block", "Platform"] and self.hitbox.colliderect(obj.rect):
+                    self.hitbox.bottom = obj.rect.top
+                    self.state = "stand"
+                    trigger_shake = 90  # Fait trembler l'écran pendant 30 frames !
+                    self.shoot_timer = 60  # Laisse une petite pause au joueur
+                    break
+            return trigger_shake
+
+        # --- CINÉMATIQUE DE MORT (Explosions en chaîne) ---
+        if self.state == "dying":
+            self.death_timer -= 1
+
+            if self.death_timer > 180:
+                # PHASE 1 (2 secondes) : Au sol, douleur, tremblement
+                self._animate("player-hurt")
+                return 15  # L'écran tremble fortement
+            else:
+                # PHASE 2 (3 secondes) : Ombre qui s'envole, plus de tremblement
+                self.hitbox.y -= 3  # S'envole vers le ciel
+
+                if self.death_timer <= 0:
+                    self.alive = False
+
+                return 0
+
         # --- TIMER HURT ---
         if self.state == "hurt":
             self.hurt_timer -= 1
             if self.hurt_timer <= 0:
                 self.state = "walk"
             self._animate("player-hurt")
-            return
+            return trigger_shake
 
         # --- DIRECTION ---
         if player.hitbox.centerx < self.hitbox.centerx:
@@ -110,57 +150,50 @@ class Boss:
 
                 # Déclenchement du tir
                 if self.shoot_timer <= 0:
-                    self.shoot_anim_timer = 25  # Fait durer l'animation de tir pendant 25 frames
-                    self._shoot(player, objects)  # Envoie les 'objects' pour faire spawner le déchet
+                    self.shoot_anim_timer = 25
+                    self._shoot(player, objects)
                     self.shoot_timer = cooldown
 
-        # --- Gravité basique pour que le boss reste au sol ---
+        # --- Gravité basique ---
         self.hitbox.y += 8
         for obj in objects:
-            if isinstance(obj, Block) and self.hitbox.colliderect(obj.rect):
+            if obj.__class__.__name__ in ["Block", "Platform"] and self.hitbox.colliderect(obj.rect):
                 self.hitbox.bottom = obj.rect.top
                 break
+
+        return trigger_shake
 
     def _shoot(self, player, objects):
         spawn_x = self.hitbox.centerx
         spawn_y = self.hitbox.centery - 20
 
-        # On calcule la distance horizontale (dx) ET verticale (dy) vers le joueur
         dx = player.hitbox.centerx - spawn_x
         dy = player.hitbox.centery - spawn_y
 
-        # PARAMÈTRES PAR DÉFAUT (Normal)
         nb_dechets = 1
         flight_time = 45.0
         spread = 1.0
-        special_straight_shot = False  # Indicateur pour le tir surpuissant
+        special_straight_shot = False
 
-        # CHANGEMENT DE PATTERN SELON LES PV
         if self.hp <= 3:
-            # PHASE 3 : Panique (Shotgun + Tir Rapide)
             nb_dechets = 3
             flight_time = 32.0
             spread = 4.0
-            # Très grande chance de faire un tir droit additionnel
             if random.random() < 0.7:
                 special_straight_shot = True
 
         elif self.hp <= 5:
-            # PHASE 2 : Rage (Sniper / Tir très rapide et tendu)
             nb_dechets = 2
             flight_time = 22.0
             spread = 1.5
-            # 50% de chance de remplacer un des tirs normaux par un tir droit puissant
             if random.random() < 0.5:
                 special_straight_shot = True
 
         elif self.hp <= 8:
-            # PHASE 1.5 : S'énerve doucement
             nb_dechets = 2
             flight_time = 40.0
             spread = 1.5
 
-        # --- CALCUL BALISTIQUE STANDARD ---
         gravity = Waste.GRAVITY
 
         base_vx = dx / flight_time
@@ -169,7 +202,6 @@ class Boss:
         base_vx = max(min(base_vx, 25), -25)
         base_vy = max(min(base_vy, 10), -35)
 
-        # CRÉATION DES DÉCHETS STANDARDS
         for _ in range(nb_dechets):
             r_file = random.choice(["tire.png", "glassBottle.png", "cardboard.png", "bottle.png", "trashBag.png"])
             scales = {"tire.png": 3, "glassBottle.png": 1, "cardboard.png": 2.7, "bottle.png": 2, "trashBag.png": 3}
@@ -180,27 +212,18 @@ class Boss:
             trash = Waste(spawn_x, spawn_y, r_file, scale=scales.get(r_file, 3), vel_x=vx_final, vel_y=vy_final)
             objects.append(trash)
 
-        # --- LE TIR PUISSANT EN LIGNE DROITE ---
         if special_straight_shot:
-            r_file = "tire.png"  # Le pneu est parfait pour un tir lourd et rapide
+            r_file = "tire.png"
             scale = 3
-
-            # Temps de vol extrêmement court pour simuler une ligne droite
             fast_flight_time = 12.0
-
-            # Recalcul balistique pour le tir tendu
             straight_vx = dx / fast_flight_time
             straight_vy = (dy / fast_flight_time) - (0.5 * gravity * fast_flight_time)
-
-            # On autorise des vitesses beaucoup plus élevées pour ce tir
             straight_vx = max(min(straight_vx, 40), -40)
             straight_vy = max(min(straight_vy, 10), -20)
-
             fast_trash = Waste(spawn_x, spawn_y, r_file, scale=scale, vel_x=straight_vx, vel_y=straight_vy)
             objects.append(fast_trash)
 
     def _animate(self, anim_name):
-        # Cherche la clé qui contient anim_name et la bonne direction
         key = next((k for k in self.sprites if anim_name in k and k.endswith("_" + self.direction)), None)
         if key is None:
             key = next((k for k in self.sprites if anim_name in k and k.endswith("_left")), None)
@@ -210,34 +233,50 @@ class Boss:
         self.animation_count += 1
 
     def draw(self, win, offset_x):
-        # Sprite
         draw_x = self.hitbox.x - offset_x - self.hitbox.width // 2
         draw_y = self.hitbox.y + 67
-        win.blit(self.sprite, (draw_x, draw_y))
-        # Barre de vie
-        self._draw_health_bar(win)
 
+        # --- EFFET VISUEL D'EXPLOSION ---
+        if self.state == "dying":
+            if self.death_timer > 180:
+                # PHASE 1 : Rendu normal du robot avec des explosions
+                win.blit(self.sprite, (draw_x, draw_y))
+                for _ in range(4):
+                    ex = draw_x + random.randint(-20, self.hitbox.width * 2)
+                    ey = draw_y + random.randint(-20, self.hitbox.height * 2)
+                    r = random.randint(20, 70)
+                    color = random.choice([(255, 100, 0), (255, 50, 0), (255, 255, 0), (200, 200, 200)])
+                    pygame.draw.circle(win, color, (ex, ey), r)
+            else:
+                # PHASE 2 : Rendu en ombre noire transparente
+                shadow = self.sprite.copy()
+                shadow.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
+
+                # Le timer restant est sur 180 frames, on calcule la transparence
+                alpha = max(0, int((self.death_timer / 180) * 255))
+                shadow.set_alpha(alpha)
+                win.blit(shadow, (draw_x, draw_y))
+        else:
+            # Rendu normal s'il est vivant
+            win.blit(self.sprite, (draw_x, draw_y))
+            self._draw_health_bar(win)
     def _draw_health_bar(self, win):
         bar_width = 300
         bar_height = 22
         bar_x = WIDTH // 2 - bar_width // 2
         bar_y = 140
 
-        # Fond
         pygame.draw.rect(win, (60, 0, 0), (bar_x - 2, bar_y - 2, bar_width + 4, bar_height + 4), border_radius=6)
         pygame.draw.rect(win, (30, 30, 30), (bar_x, bar_y, bar_width, bar_height), border_radius=5)
 
-        # Barre HP
         ratio = max(0, self.hp / self.MAX_HP)
         color = (220, 50, 50) if not self.is_rage else (255, 120, 0)
         filled_w = int(bar_width * ratio)
         if filled_w > 0:
             pygame.draw.rect(win, color, (bar_x, bar_y, filled_w, bar_height), border_radius=5)
 
-        # Contour
         pygame.draw.rect(win, (200, 200, 200), (bar_x, bar_y, bar_width, bar_height), 2, border_radius=5)
 
-        # Texte
         font = pygame.font.SysFont("arial", 20, bold=True)
         label = font.render(f"PDG DE LA POLLUTION  {self.hp} / {self.MAX_HP}", True, (255, 255, 255))
         win.blit(label, (bar_x + bar_width // 2 - label.get_width() // 2, bar_y + 2))
