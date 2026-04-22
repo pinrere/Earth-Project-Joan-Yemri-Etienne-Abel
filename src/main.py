@@ -315,8 +315,8 @@ def main(window, start_level=0):
             # --- SPAWN DES AVIONS ---
             if current_level > 0:
                 avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-                max_planes = {1: 2, 2: 4, 3: 6, 4: 6}.get(current_level, 0)
-                spawn_chance = {1: 100, 2: 50, 3: 20, 4: 20}.get(current_level, 999)
+                max_planes = {1: 2, 2: 3, 3: 4, 4: 6}.get(current_level, 0)
+                spawn_chance = {1: 100, 2: 50, 3: 20, 4: 10}.get(current_level, 999)
 
                 if avions_actifs < max_planes:
                     if random.randint(1, spawn_chance) == 1:
