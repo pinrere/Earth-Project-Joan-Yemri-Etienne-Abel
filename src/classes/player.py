@@ -156,6 +156,9 @@ class Player(pygame.sprite.Sprite):
 
     def loop(self, fps):
         self.y_vel += self.GRAVITY
+        vitesse_max_chute = 15
+        if self.y_vel > vitesse_max_chute:
+            self.y_vel = vitesse_max_chute
 
         self.hitbox.x += self.x_vel
         self.rect.topleft = self.hitbox.topleft

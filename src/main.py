@@ -273,7 +273,6 @@ def main(window, start_level=0, loop_count = 0):
                     obj.update(objects, water=water)
 
                     if obj.rect.colliderect(water.rect):
-                        water.up()
                         if obj in objects:
                             objects.remove(obj)
                         continue
