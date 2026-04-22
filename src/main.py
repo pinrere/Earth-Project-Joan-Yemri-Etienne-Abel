@@ -22,6 +22,9 @@ from src.fonctions_menu.main_menu import main_menu
 from src.fonctions_menu.show_level_transition import show_level_transition
 from src.fonctions_menu.victory_screen import victory_screen
 from src.fonctions_menu.game_over_screen import game_over_screen
+from src.fonctions.reset_level_state import reset_level_state
+from src.fonctions_menu.level_selection_menu import level_selection_menu
+
 pygame.init()
 
 pygame.display.set_caption("Eco Guardian")
@@ -32,7 +35,9 @@ PLAYER_VEL = 5
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
-def main(window, start_level=0):
+
+
+def main(window, start_level=0, loop_count = 0):
     clock = pygame.time.Clock()
     current_level = start_level
     total_recycled = 0
@@ -42,9 +47,10 @@ def main(window, start_level=0):
     level_times = {0: 150, 1: 110, 2: 150, 3: 200, 4: 60, 5: 300}
     frames_left = level_times.get(current_level, 60) * FPS
 
-    show_level_transition(window, current_level)
-
     parallax_bg = ParallaxBackground(window)
+
+    show_level_transition(window, current_level, loop_count, parallax_bg)
+
     block_size = 96
 
     img_top = pygame.image.load(join("assets", "Terrain", "topBridge.png")).convert_alpha()
@@ -148,6 +154,13 @@ def main(window, start_level=0):
     while run:
         clock.tick(FPS)
         cpt += 1
+        if current_level == 0:
+            level_goal = 6
+        elif current_level in [1, 2, 3]:
+            # On ajoute 10 par boucle (0, 10, 20...)
+            level_goal = {1: 10, 2: 15, 3: 20}[current_level] + (loop_count * 10)
+        else:
+            level_goal = 9999
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -160,7 +173,23 @@ def main(window, start_level=0):
                     paused = not paused
 
         if paused:
-            draw_pause_menu(window)
+            choix_niveau = level_selection_menu(window)
+
+            if choix_niveau is not None:
+                current_level = choix_niveau
+                reset_level_state(player, water, current_level, HEIGHT)
+                frames_left = level_times.get(current_level, 60) * FPS
+                show_level_transition(window, current_level, loop_count, parallax_bg)
+
+                if current_level == 4:
+                    boss = None
+
+                if current_level == 5:
+                    player.hitbox.x = 200
+                    player.hitbox.y = HEIGHT - block_size * 3
+                    boss = None
+
+            paused = False
             continue
 
         frames_left -= 1
@@ -219,10 +248,12 @@ def main(window, start_level=0):
             if not boss.alive:
                 draw(window, parallax_bg, player, objects, offset_x, frames_left,
                      wrong_bin_timer, throw_harder_timer, total_recycled,
-                     level_goals.get(current_level, 999), boss)
-                pygame.time.wait(800)
+                     level_goal, boss)
+                pygame.time.wait(2000)
                 rejouer = victory_screen(window)
-                return rejouer
+                if rejouer:
+                    return "REPLAY", loop_count + 1  # On relance avec +1 boucle
+                return "QUIT", loop_count
 
         else:
             for obj in objects[:]:
@@ -234,14 +265,16 @@ def main(window, start_level=0):
                         death_message = "Vous avez noyé votre planète..."
 
                 if isinstance(obj, Avion):
-                    total_frames = level_times.get(current_level, 60) * FPS
-                    frames_elapsed = total_frames - frames_left
-                    is_rush_hour = frames_elapsed < (total_frames / 5)
+                    if current_level == 4:
+                        is_rush_hour = True
+                    else:
+                        is_rush_hour = False
 
-                    obj.update(objects, total_recycled, level_goals.get(current_level, 999), is_rush_hour,
-                               player.trash_collected)
+                        # ON PASSE LE NOUVEL OBJECTIF (level_goal) AUX AVIONS
+                    obj.update(objects, total_recycled, level_goal, is_rush_hour, player.trash_collected)
 
-                    if (obj.direction == 1 and obj.rect.left > 3500) or (obj.direction == -1 and obj.rect.right < -1500):
+                    if (obj.direction == 1 and obj.rect.left > 3500) or (
+                            obj.direction == -1 and obj.rect.right < -1500):
                         if obj in objects: objects.remove(obj)
                         continue
 
@@ -273,17 +306,22 @@ def main(window, start_level=0):
                                 if correct_color == other.color:
                                     objects.remove(obj)
                                     total_recycled += 1
-                                    if total_recycled >= level_goals.get(current_level, 999):
+
+                                    if current_level in [1, 2, 3]:
+                                        objectif = {1: 10, 2: 15, 3: 20}[current_level] + (loop_count * 10)
+                                    else:
+                                        objectif = {0: 6, 4: 9999, 5: 9999}.get(current_level, 999)
+
+                                    if total_recycled >= objectif:
                                         current_level += 1
                                         total_recycled = 0
                                         frames_left = level_times.get(current_level, 60) * FPS
-                                        show_level_transition(window, current_level)
+                                        show_level_transition(window, current_level, loop_count, parallax_bg)
 
                                         player.hitbox.x = 400
                                         player.hitbox.y = 520
                                         player.x_vel = 0
                                         player.y_vel = 0
-                                        player.health = player.max_health
                                         player.inventory.clear()
                                         player.trash_collected = 0
 
@@ -315,81 +353,53 @@ def main(window, start_level=0):
                                             objects.remove(obj)
                                 break
 
-            # --- SPAWN DES AVIONS ---
-            if current_level > 0:
+                        # --- SPAWN DES AVIONS ---
+            if current_level > 0 and current_level < 5:
                 avions_actifs = sum(1 for o in objects if isinstance(o, Avion))
-                max_planes = {1: 2, 2: 3, 3: 4, 4: 8}.get(current_level, 0)
-                spawn_chance = {1: 100, 2: 50, 3: 20, 4: 10}.get(current_level, 999)
+                max_planes = {1: 2, 2: 3, 3: 4, 4: 12}.get(current_level, 0)
+                spawn_chance = {1: 120, 2: 80, 3: 50, 4: 5}.get(current_level, 999)
 
                 if avions_actifs < max_planes:
                     if random.randint(1, spawn_chance) == 1:
                         spawn_avion(objects, current_level)
 
-        # --- CONDITION DE DÉFAITE ---
-        if player.health <= 0:
-            player.health = player.max_health
+                # --- LOGIQUE DE MORT ---
+            if player.health <= 0:
+                rejouer = game_over_screen(window)
+                if rejouer:
+                    return "REPLAY", 0  # On recommence tout
+                else:
+                    return "QUIT", 0
 
-        # --- PASSAGE VERS L'ARÈNE DU BOSS (NIVEAU 5) ---
-        if current_level == 4 and player.hitbox.x >= 28 * block_size:
-            current_level = 5
-            frames_left = level_times.get(current_level, 300) * FPS
-            death_message = "VOUS ÊTES MORT"
-            player.health = player.max_health
-            player.inventory.clear()
-            player.trash_collected = 0
+                # --- TRANSITION NIVEAU 4 -> 5 ---
+            if current_level == 4:
+                for o in objects[:]:
+                    if isinstance(o, Block) and o.rect.x >= 27 * block_size and o.rect.y < HEIGHT - block_size * 4:
+                        objects.remove(o)
+                if player.hitbox.x >= 28 * block_size:
+                    current_level = 5
+                    frames_left = level_times.get(current_level, 300) * FPS
+                    reset_level_state(player, water, current_level, HEIGHT)
+                    show_level_transition(window, current_level, loop_count, parallax_bg)
 
-            show_level_transition(window, current_level)
-            pygame.event.clear()  # <-- vide la queue APRES la transition
-
-            objects.clear()
-            # Sol plat de l'arène (sans tour centrale)
-            boss_floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in range(-3, 22)]
-            boss_bottom = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in range(-3, 22)]
-
-            # Quelques plateformes pour rendre l'arène moins vide
-            boss_plateforms = [
-                Platform(200, HEIGHT - block_size * 4),
-                Platform(500, HEIGHT - block_size * 5),
-                Platform(900, HEIGHT - block_size * 4),
-                Platform(1200, HEIGHT - block_size * 5),
-            ]
-
-            # Murs
-            boss_left_wall = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                               else Block(-3 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-            boss_left_left_wall = [Block(-4 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                              else Block(-4 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-            boss_left_left_left_wall = [Block(-5 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                                   else Block(-5 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-            boss_right_wall = [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                                else Block(20 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-            boss_right_right_wall = [Block(21 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                               else Block(21 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-            boss_right_right_right_wall = [Block(22 * block_size, i * block_size, block_size, "dirtBlock.png") if i != 0
-                                     else Block(22 * block_size, i * block_size, block_size, "dirtGrassBlock.png") for i in range(-5, 9)]
-
-            objects.extend(boss_floor)
-            objects.extend(boss_bottom)
-            objects.extend(boss_plateforms)
-            objects.extend(boss_left_wall)
-            objects.extend(boss_right_wall)
-            objects.extend(boss_left_left_wall)
-            objects.extend(boss_right_right_wall)
-            objects.extend(boss_left_left_left_wall)
-            objects.extend(boss_right_right_right_wall)
-
-            # NOUVEAU : Spawn du boss TRÈS HAUT dans le ciel (-800)
-            boss = Boss(10 * block_size, -800)
-            boss_waste_spawn_timer = 60  # Premier déchet après 1 seconde
-
-            player.hitbox.x = 100
-            player.hitbox.y = HEIGHT - block_size * 3
-
-            offset_x = 0
-            scroll = 0
-            saved_offset_x = 0
-            saved_scroll = 0
-            camera_shifted = False
+                # --- GÉNÉRATION ARÈNE BOSS ---
+            if current_level == 5 and boss is None:
+                player.health = player.max_health
+                for o in objects[:]:
+                    if not isinstance(o, Water): objects.remove(o)
+                boss_floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
+                              range(-3, 22)]
+                boss_bottom = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
+                               range(-3, 22)]
+                boss_plateforms = [Platform(200, HEIGHT - block_size * 4), Platform(500, HEIGHT - block_size * 5),
+                                   Platform(900, HEIGHT - block_size * 4), Platform(1200, HEIGHT - block_size * 5)]
+                boss_walls = [Block(-3 * block_size, i * block_size, block_size, "dirtBlock.png") for i in range(-5, 9)]
+                boss_walls += [Block(20 * block_size, i * block_size, block_size, "dirtBlock.png") for i in
+                               range(-5, 9)]
+                objects.extend(boss_floor + boss_bottom + boss_plateforms + boss_walls)
+                boss = Boss(10 * block_size, -800)
+                player.hitbox.x, player.hitbox.y = 200, HEIGHT - block_size * 3
+                offset_x, camera_shifted = 0, False
 
         if current_level < 5:
             if player.hitbox.x <= -95 and not camera_shifted:
@@ -417,9 +427,6 @@ def main(window, start_level=0):
         if throw_harder_timer > 0:
             throw_harder_timer -= 1
 
-        level_goal = level_goals.get(current_level, 999)
-
-        # Nettoyeur anti-lag pour les déchets perdus
         for obj in objects[:]:
             if obj.__class__.__name__ == "Waste" and obj.rect.y > HEIGHT + 200:
                 objects.remove(obj)
@@ -448,13 +455,19 @@ def main(window, start_level=0):
     pygame.quit()
     quit()
 
+
 if __name__ == "__main__":
     jeu_en_cours = True
+    current_loop = 0
 
-    while jeu_en_cours:
-        main_menu(window)
-        vouloir_rejouer = main(window, start_level=3)
-        if not vouloir_rejouer:
+    main_menu(window)
+
+    prochain_niveau = level_selection_menu(window)
+    while jeu_en_cours and prochain_niveau is not None:
+        etat, current_loop = main(window, start_level=prochain_niveau, loop_count=current_loop)
+        if etat == "REPLAY":
+            prochain_niveau = 1
+        else:
             jeu_en_cours = False
 
     pygame.quit()

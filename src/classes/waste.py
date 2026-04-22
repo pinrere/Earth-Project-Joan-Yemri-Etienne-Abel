@@ -80,6 +80,16 @@ class Waste(Object):
                     self.pos_y = self.rect.y
                     self.y_vel *= -self.BOUNCE_DAMPING
 
+        for obj in objects:
+            if isinstance(obj, Block) or isinstance(obj, Platform):
+                if self.rect.colliderect(obj.rect):
+                    # Si on est coincé à l'intérieur d'un bloc au spawn
+                    # On se téléporte juste au-dessus
+                    self.rect.bottom = obj.rect.top
+                    self.pos_y = float(self.rect.y)  # On synchronise la position réelle
+                    self.y_vel = 0  # Correction du nom de la variable
+                    self.on_ground = True
+
         if self.on_ground:
             self.is_launched = False
             self.is_dangerous = False
