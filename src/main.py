@@ -66,7 +66,7 @@ def main(window, start_level=0, loop_count = 0):
     player = Player(400, 520, 60, 96)
 
     floor = [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtGrassBlock.png") for i in
-             range(-10, 23) if i not in [3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]]
+             range(-10, 23) if i not in [-4,-3,3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]]
     floor += [Block(i * block_size, HEIGHT - block_size * 4, block_size, "dirtGrassBlock.png") for i in
               range(14, 31) if i not in [16, 17, 18, 21, 22, 23, 24]]
     floor += [Block(i * block_size, HEIGHT - block_size, block_size, "dirtGrassBlock.png") for i in
@@ -74,7 +74,7 @@ def main(window, start_level=0, loop_count = 0):
     floor += [Block(6 * block_size, HEIGHT - block_size * 6, block_size, "dirtGrassBlock.png")]
 
     bottom_floor = [Block(i * block_size, HEIGHT - block_size, block_size, "dirtBlock.png") for i in
-                    range(-10, 31) if i not in [3, 4, 5, 9, 10, 11, 12, 13, 16, 17, 18, 23, 24]]
+                    range(-10, 31) if i not in [-4,-3,3, 4, 5, 9, 10, 11, 12, 13, 16, 17, 18, 23, 24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 2, block_size, "dirtBlock.png") for i in
                      range(14, 31) if i not in [16, 17, 18, 21, 22, 23, 24]]
     bottom_floor += [Block(i * block_size, HEIGHT - block_size * 3, block_size, "dirtBlock.png") for i in
@@ -271,6 +271,12 @@ def main(window, start_level=0, loop_count = 0):
 
                 if isinstance(obj, Waste):
                     obj.update(objects, water=water)
+
+                    if obj.rect.colliderect(water.rect):
+                        water.up()
+                        if obj in objects:
+                            objects.remove(obj)
+                        continue
 
                     if obj.rect.colliderect(player.hitbox) and obj.is_dangerous:
                         if current_level > 0:
